@@ -250,7 +250,10 @@ export default function WorkshopScopeCoveragePanel({
           <h2 id="workshop-scope-heading" style={{ margin: 0, color: C.plum }}>Phạm vi xưởng</h2>
           <p style={{ margin: "6px 0 0", color: C.plumSoft }}>Giao bộ phận, khu vực cho nhân sự xưởng.</p>
         </div>
-        <button type="button" className="cw-nut cw-nut--phu" onClick={refresh}><RefreshCw size={14} /> Làm mới</button>
+        <button type="button" className="cw-nut cw-nut--phu" onClick={refresh}
+          disabled={state.status === "loading"} aria-busy={state.status === "loading"}>
+          <RefreshCw size={14} aria-hidden="true" className={state.status === "loading" ? "cw-xoay" : undefined} /> Làm mới
+        </button>
       </div>
 
       {areaLessSourceCount > 0 && (

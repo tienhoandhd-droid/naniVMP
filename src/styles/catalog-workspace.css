@@ -1253,3 +1253,9 @@ span.tdd-qua-han { font-size: 11px; font-weight: 800; }
 }
 .tdd-han { color: var(--lp-ink); font-size: 15px; }
 .tdd-goi-y__nut { flex-direction: column; align-items: flex-start; gap: 2px; }
+
+/* Nút Tải lại đang chạy: biểu tượng xoay (keyframes spin ở index.css). */
+.cw-xoay { animation: spin 900ms linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .cw-xoay { animation: none; }
+}

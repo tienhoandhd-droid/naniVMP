@@ -132,21 +132,31 @@ function isMissingCanonicalDashboardRpc(error: { message: string; code?: string 
     .test(error.message);
 }
 
+/* Máy chủ nào đã trả "thiếu hàm v2" thì nhớ lại trong phiên, lần sau gọi thẳng
+ * v1. Production chưa có v2 (gỡ 16/10) nên trước đây MỖI lần tải dashboard mất
+ * một lượt 404 (~0,4s). Tải lại trang là hỏi lại v2 — áp v2 lên thì tự dùng. */
+const daBietThieuV2 = new WeakSet<object>();
+
 export async function fetchCanonicalDashboardViaRpc(
   rpc: CanonicalDashboardRpc,
   year: number,
   includeMissing = false,
+  /** Khoá nhớ "máy chủ thiếu v2" (thường là supabase client); bỏ trống thì luôn thử v2. */
+  khoaNho?: object,
 ): Promise<VmpDataset> {
   const args = {
     p_year: year,
     p_include_missing: includeMissing,
   };
-  const canonical = await rpc("rpc_get_vmp_dashboard_v2", args);
+  const canonical = khoaNho && daBietThieuV2.has(khoaNho)
+    ? { data: null, error: { code: "PGRST202", message: "Could not find the function public.rpc_get_vmp_dashboard_v2 in the schema cache (đã nhớ)" } }
+    : await rpc("rpc_get_vmp_dashboard_v2", args);
   if (canonical.error && !isMissingCanonicalDashboardRpc(canonical.error)) {
     throw new Error("Lỗi đọc dữ liệu máy chủ: " + canonical.error.message);
   }
 
   if (canonical.error) {
+    if (khoaNho) daBietThieuV2.add(khoaNho);
     const legacy = await rpc("rpc_get_vmp_dashboard", args);
     if (legacy.error) throw new Error("Lỗi đọc dữ liệu máy chủ: " + legacy.error.message);
     const payload = decodeAuthorizedDashboard(legacy.data);
@@ -194,14 +204,15 @@ export async function fetchVmpDataFromSupabase(
       ? await client.rpc("rpc_get_vmp_dashboard_v2" as never, args as never)
       : await client.rpc("rpc_get_vmp_dashboard" as never, args as never);
     return { data, error: error ? { message: error.message, code: error.code } : null };
-  }, year || new Date().getFullYear(), includeMissing);
+  }, year || new Date().getFullYear(), includeMissing, client);
 }
 
 // ============================================================
 // ĐỌC: Watermark nhẹ để poll phát hiện thay đổi (không kéo cả payload)
 // ============================================================
 // Trả { year, plan_items, objects, updated_at }. Frontend so chuỗi watermark
-// trước khi refetch toàn bộ dashboard → poll 20s gần như miễn phí khi không đổi.
+// trước khi refetch toàn bộ dashboard. Từ migration 20261023120000 quyền xem tính
+// một lần mỗi câu lệnh → watermark còn vài mili giây, poll 20s không đáng kể.
 export async function fetchVmpWatermark(year?: number): Promise<AuthorizationWatermark> {
   if (!supabase) throw new Error(CHUA_KET_NOI);
   const { data, error } = await supabase.rpc("rpc_get_vmp_watermark", {

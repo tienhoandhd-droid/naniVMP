@@ -514,6 +514,8 @@ export default function CatalogWorkspaceShell({
   /* ---------------- Hộp thoại ------------------------------------- */
   const [dangSuaObj, setDangSuaObj] = useState<{ row: Record<string, unknown>; taoMoi: boolean } | null>(null);
   const [dangSuaBan, setDangSuaBan] = useState<{ dataset: CatalogDatasetId; record: CatalogRecord | null } | null>(null);
+  // Đang xuất thì khoá nút: bấm đôi từng xuất ra 2 file.
+  const [dangXuat, setDangXuat] = useState(false);
   const [moSinh, setMoSinh] = useState(false);
   const [changeId, setChangeId] = useState<string | null>(null);
 
@@ -543,7 +545,8 @@ export default function CatalogWorkspaceShell({
 
   /* Xuất đúng phần đang lọc của bảng đối tượng — tiện tra cứu, chỉ đọc. */
   const xuatExcel = async () => {
-    if (!sourceControls.canExport || !hasAuthorizationRevision || vmpDateError) return;
+    if (!sourceControls.canExport || !hasAuthorizationRevision || vmpDateError || dangXuat) return;
+    setDangXuat(true);
     const progress = toast.dangChay("Đang xuất Excel…");
     try {
       const dinhNghia = layDataset("objects").fields;
@@ -564,8 +567,16 @@ export default function CatalogWorkspaceShell({
     } catch (cause) {
       console.error("[Dữ liệu nguồn] Không xuất được Excel:", cause);
       progress.hong("Không xuất được Excel.");
+    } finally {
+      setDangXuat(false);
     }
   };
+
+  // Đang tải thì nút Tải lại khoá + xoay biểu tượng, để biết bấm đã có tác dụng.
+  const dangTaiVung = vung === "objects" ? objState === "loading"
+    : vung === "pending" ? pen.state === "loading"
+    : vung === "history" ? his.state === "loading"
+    : svState === "loading";
 
   const taiLai = () => {
     if (vung === "objects") taiDoiTuong();
@@ -672,13 +683,13 @@ export default function CatalogWorkspaceShell({
               <details className="cw-tools" data-cw-tools>
                 <summary>Công cụ dữ liệu</summary>
                 <div className="cw-tools__actions" role="group" aria-label="Công cụ dữ liệu nguồn">
-                  <button type="button" className="cw-nut" onClick={taiLai}>
-                    <RefreshCw size={15} aria-hidden="true" /> Tải lại
+                  <button type="button" className="cw-nut" onClick={taiLai} disabled={dangTaiVung} aria-busy={dangTaiVung}>
+                    <RefreshCw size={15} aria-hidden="true" className={dangTaiVung ? "cw-xoay" : undefined} /> Tải lại
                   </button>
                   {sourceControls.canExport && (
                     <button type="button" className="cw-nut" data-cw-export-count={objTotal}
-                      disabled={!hasAuthorizationRevision||!!vmpDateError} onClick={xuatExcel}>
-                      <Download size={15} aria-hidden="true" /> Xuất Excel
+                      disabled={!hasAuthorizationRevision||!!vmpDateError||dangXuat} aria-busy={dangXuat} onClick={xuatExcel}>
+                      <Download size={15} aria-hidden="true" /> {dangXuat ? "Đang xuất…" : "Xuất Excel"}
                     </button>
                   )}
                   {canSinhTimeline && hasAuthorizationRevision && (
@@ -706,8 +717,8 @@ export default function CatalogWorkspaceShell({
                   onChange={(e) => { setQ(e.target.value); setTrang(0); setExpandedId(null); }}
                 />
               </div>
-              <button type="button" className="cw-nut" onClick={taiLai}>
-                <RefreshCw size={15} aria-hidden="true" /> Tải lại
+              <button type="button" className="cw-nut" onClick={taiLai} disabled={dangTaiVung} aria-busy={dangTaiVung}>
+                <RefreshCw size={15} aria-hidden="true" className={dangTaiVung ? "cw-xoay" : undefined} /> Tải lại
               </button>
             </CommandBar>
           )}

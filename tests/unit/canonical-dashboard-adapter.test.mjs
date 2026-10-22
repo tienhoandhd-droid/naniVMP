@@ -107,3 +107,20 @@ test("adapter chỉ lùi về RPC v1 khi PostgREST báo thiếu hàm v2", async 
   assert.equal(result.activities[0].target, "2026-09-30");
   assert.equal(result.authorizationRevision, 42);
 });
+
+test("adapter nhớ máy chủ thiếu v2: lần sau gọi thẳng v1, khoá khác vẫn thử v2", async () => {
+  const may = {};
+  const calls = [];
+  const rpc = async (name) => {
+    calls.push(name);
+    if (name === "rpc_get_vmp_dashboard_v2") {
+      return { data: null, error: { code: "PGRST202", message: "Could not find the function public.rpc_get_vmp_dashboard_v2 in the schema cache" } };
+    }
+    return { data: legacyPayload, error: null };
+  };
+  await fetchCanonicalDashboardViaRpc(rpc, 2026, false, may);
+  await fetchCanonicalDashboardViaRpc(rpc, 2026, false, may);
+  assert.deepEqual(calls, ["rpc_get_vmp_dashboard_v2", "rpc_get_vmp_dashboard", "rpc_get_vmp_dashboard"]);
+  await fetchCanonicalDashboardViaRpc(rpc, 2026, false, {});
+  assert.equal(calls.at(-2), "rpc_get_vmp_dashboard_v2");
+});

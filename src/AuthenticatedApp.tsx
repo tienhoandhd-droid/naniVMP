@@ -1138,7 +1138,10 @@ function VerifiedAppShell({ user, logout, access }: {
                 <TodayCommandCenterMemo
                   acts={todayActs}
                   scopeLabel={nhanPhamViToday}
-                  state={conn.status === "loading" ? "loading" : conn.status === "err" ? "error" : "ready"}
+                  /* "idle" = chưa bắt đầu tải: chưa có dữ liệu thì hiện khung đang tải,
+                     không hiện "Không còn việc gấp nào" (từng nháy lên lúc mở app). */
+                  state={conn.status === "loading" || (conn.status === "idle" && todayActs.length === 0)
+                    ? "loading" : conn.status === "err" ? "error" : "ready"}
                   onRetry={reloadData}
                   hasScopeFilters={deptSel.length > 0 || areaSel.length > 0}
                   onClearScope={clearTodayScope}

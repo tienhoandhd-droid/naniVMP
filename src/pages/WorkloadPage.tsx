@@ -134,8 +134,15 @@ export default function WorkloadView({ acts, businessRole, onReload }: {
      xảy ra. Nay mở tab (nếu khác) rồi cuộn tới panel của tab đó. */
   const moTabSo = (id: (typeof TAB_IDS)[number]) => {
     setTab(id);
-    requestAnimationFrame(() => document.getElementById(`workload-panel-${id}`)
-      ?.scrollIntoView({ block: "start", behavior: "smooth" }));
+    requestAnimationFrame(() => {
+      const panel = document.getElementById(`workload-panel-${id}`);
+      panel?.scrollIntoView({ block: "start", behavior: "smooth" });
+      /* Tab đang mở sẵn thì cuộn cũng không đổi gì → nháy viền một nhịp để
+       * người bấm biết ô số đã đưa họ tới đâu (trước đây bấm như không). */
+      panel?.classList.remove("wl-nhay");
+      void panel?.offsetWidth;
+      panel?.classList.add("wl-nhay");
+    });
   };
 
   const pend = useMemo(() => acts.filter((a) => a.st !== "done" && wlMonthOf(a) >= 0), [acts]);
