@@ -75,25 +75,6 @@ as $$
    where t <> ''
 $$;
 
--- Những tên phụ trách (chính hoặc hỗ trợ) khớp chữ đã gõ, trong phạm vi người hỏi.
--- Trùng khít một tên thì chỉ trả tên đó.
-create or replace function public.vmp_tl_ten_khop(p_uid uuid, p_go text)
-returns text[]
-language sql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-  with ten as (
-    select distinct t from public.vmp_tl_hang_muc(p_uid) h,
-           lateral unnest(array[h.owner_name, h.secondary_owner]) t
-     where t is not null and public.vmp_tl_khop_ten(t, p_go)
-  )
-  select case when exists (select 1 from ten where public.vmp_tl_chuan(t) = public.vmp_tl_chuan(p_go))
-              then (select array_agg(t) from ten where public.vmp_tl_chuan(t) = public.vmp_tl_chuan(p_go))
-              else (select array_agg(t order by t) from ten) end
-$$;
-
 create or replace function public.vmp_tl_ngay(p date)
 returns text
 language sql
@@ -171,6 +152,25 @@ as $$
          case when m.la_xong or m.deadline_vmp is null then null
               else m.deadline_vmp - public.vmp_tl_hom_nay() end
     from muc m
+$$;
+
+-- Những tên phụ trách (chính hoặc hỗ trợ) khớp chữ đã gõ, trong phạm vi người hỏi.
+-- Trùng khít một tên thì chỉ trả tên đó.
+create or replace function public.vmp_tl_ten_khop(p_uid uuid, p_go text)
+returns text[]
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with ten as (
+    select distinct t from public.vmp_tl_hang_muc(p_uid) h,
+           lateral unnest(array[h.owner_name, h.secondary_owner]) t
+     where t is not null and public.vmp_tl_khop_ten(t, p_go)
+  )
+  select case when exists (select 1 from ten where public.vmp_tl_chuan(t) = public.vmp_tl_chuan(p_go))
+              then (select array_agg(t) from ten where public.vmp_tl_chuan(t) = public.vmp_tl_chuan(p_go))
+              else (select array_agg(t order by t) from ten) end
 $$;
 
 -- Bộ lọc chung. Tham số đã được rpc_tro_ly_tra_loi kiểm trước.
