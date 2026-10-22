@@ -345,6 +345,24 @@ from (select x from jsonb_array_elements(public.rpc_change_list()->'records') x
 select pg_temp.ghi('4', 'gợi ý mã thiết bị trả đúng thiết bị A',
   exists (select 1 from jsonb_array_elements(public.rpc_change_search_objects((select tb_a from moc))) x
            where x->>'code' = (select tb_a from moc)));
+-- 20261022150000: tìm không dấu, theo tên; gợi ý kèm khu + line.
+select pg_temp.ghi('4', 'gợi ý: gõ tên KHÔNG DẤU vẫn ra thiết bị có dấu',
+  exists (select 1 from jsonb_array_elements(public.rpc_change_search_objects(
+            (select lower(extensions.unaccent(o.name)) from public.vmp_objects o
+              where o.is_active and o.name <> extensions.unaccent(o.name) order by o.code limit 1))) x
+           where x->>'code' = (select o.code from public.vmp_objects o
+                                where o.is_active and o.name <> extensions.unaccent(o.name) order by o.code limit 1)),
+  (select o.name from public.vmp_objects o where o.is_active and o.name <> extensions.unaccent(o.name) order by o.code limit 1));
+select pg_temp.ghi('4', 'gợi ý trả đủ tên, khu, line',
+  (select bool_and(x ? 'name' and x ? 'area' and x ? 'line')
+     from jsonb_array_elements(public.rpc_change_search_objects('tank')) x)
+  and jsonb_array_length(public.rpc_change_search_objects('tank')) > 0);
+select pg_temp.ghi('4', 'gõ "%" không biến thành tìm tất cả',
+  jsonb_array_length(public.rpc_change_search_objects('%%')) = 0);
+select pg_temp.ghi('4', 'danh sách: thiết bị đã gắn có khu + line',
+  (x->'objects'->0) ? 'area' and (x->'objects'->0) ? 'line', left((x->'objects')::text, 200))
+from (select x from jsonb_array_elements(public.rpc_change_list()->'records') x
+       where x->>'id' = (select id::text from phieu)) t;
 select pg_temp.ghi('4', 'nhãn Tiến độ: đợt A mang mã phiếu',
   exists (select 1 from jsonb_array_elements(public.rpc_change_plan_badges()->'badges') b
            where b->>'plan_item_id' = (select dot_a from moc)

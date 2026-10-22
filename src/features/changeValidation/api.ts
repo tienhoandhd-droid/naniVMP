@@ -3,6 +3,7 @@ import {
   ChangeRefusedError,
   decodeChangeList,
   decodeChangeWrite,
+  decodeObject,
   type ChangeHandlingStatus,
   type ChangeListResult,
   type ChangeObject,
@@ -37,14 +38,12 @@ export async function searchChangeObjects(query: string): Promise<ChangeObject[]
   const list: unknown = data;
   if (!Array.isArray(list)) return [];
   return list.flatMap((item: unknown) => {
-    if (!item || typeof item !== "object") return [];
-    const raw = item as Record<string, unknown>;
-    if (typeof raw.code !== "string") return [];
-    return [{
-      code: raw.code,
-      name: typeof raw.name === "string" ? raw.name : null,
-      department: typeof raw.department === "string" ? raw.department : null,
-    }];
+    try {
+      return [decodeObject(item)];
+    } catch (cause) {
+      console.error("[thay đổi] bỏ gợi ý thiết bị sai dạng:", cause, item);
+      return [];
+    }
   });
 }
 

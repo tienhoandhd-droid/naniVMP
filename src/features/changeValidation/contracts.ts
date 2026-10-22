@@ -13,7 +13,13 @@ export const HANDLING_STATUS_LABEL: Record<ChangeHandlingStatus, string> = {
 };
 const HANDLING_STATUSES = Object.keys(HANDLING_STATUS_LABEL) as ChangeHandlingStatus[];
 
-export interface ChangeObject { code: string; name: string | null; department: string | null }
+export interface ChangeObject {
+  code: string;
+  name: string | null;
+  department: string | null;
+  area: string | null;
+  line: string | null;
+}
 
 export interface ChangePlanItem {
   id: string;
@@ -101,9 +107,12 @@ function optInt(value: unknown): number | null {
   return Number.isSafeInteger(value) ? value as number : null;
 }
 
-function decodeObject(value: unknown): ChangeObject {
+export function decodeObject(value: unknown): ChangeObject {
   const raw = record(value, "thiết bị");
-  return { code: text(raw.code, "mã thiết bị"), name: optText(raw.name), department: optText(raw.department) };
+  return {
+    code: text(raw.code, "mã thiết bị"), name: optText(raw.name), department: optText(raw.department),
+    area: optText(raw.area), line: optText(raw.line),
+  };
 }
 
 function decodePlanItem(value: unknown): ChangePlanItem {

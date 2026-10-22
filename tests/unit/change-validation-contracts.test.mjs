@@ -48,7 +48,7 @@ const ketQua = (records) => ({
 
 test("đọc danh sách phiếu từ rpc_change_list", () => {
   const kq = decodeChangeList(ketQua([ban({
-    objects: [{ code: "CCTB01", name: "Cân", department: "XSX" }],
+    objects: [{ code: "CCTB01", name: "Cân", department: "XSX", area: "A2", line: "Cân chung" }],
     plan_items: [{
       id: "CCTB01/2026.01-OQ", validation_code: "CCTB01/2026.01-OQ", object_code: "CCTB01",
       validation_type: "OQ", year: 2026, computed_status: "on_track", deadline_validation: null, linked: true,
@@ -58,6 +58,8 @@ test("đọc danh sách phiếu từ rpc_change_list", () => {
   assert.equal(kq.canCreatePlan, false, "không gửi can_create_plan thì không cho tạo đợt");
   assert.equal(kq.records[0].changeCode, "CC-XSX-2605-001");
   assert.equal(kq.records[0].objects[0].code, "CCTB01");
+  assert.equal(kq.records[0].objects[0].area, "A2");
+  assert.equal(kq.records[0].objects[0].line, "Cân chung");
   assert.equal(kq.records[0].planItems[0].linked, true);
   assert.equal(kq.sync.lastStatus, "xong");
 });

@@ -53,7 +53,7 @@ function banGhi() {
     deadline_sheet: "2026-10-30", deadline_override: null, deadline: "2026-10-30",
     removed_from_sheet_at: null, handling_status: "cho_xu_ly", note: null, version: may.version,
     updated_at: "2026-10-22T01:43:11.881247+00:00",
-    objects: may.objects.map((code) => ({ code, name: "Cân chung", department: "Xưởng sản xuất" })),
+    objects: may.objects.map((code) => ({ code, name: "LAF cân nguyên liệu", department: "xsx", area: "A2", line: "Cân chung" })),
     plan_items: may.objects.includes("CCTB01") || may.linked.length
       ? [{ ...PLAN, linked: may.linked.includes(PLAN.id) }] : [],
   };
@@ -88,7 +88,7 @@ try {
         },
       });
       store.rpc_change_search_objects = (body) => String(body?.p_query ?? "").length >= 2
-        ? [{ code: "CCTB01", name: "Cân chung", department: "Xưởng sản xuất" }] : [];
+        ? [{ code: "CCTB01", name: "LAF cân nguyên liệu", department: "xsx", area: "A2", line: "Cân chung" }] : [];
       store.rpc_change_save = (body) => {
         may.saves.push(body);
         if (String(body?.p_note ?? "").includes("xung đột")) {
@@ -148,7 +148,12 @@ try {
   await page.waitForSelector(".tdd-goi-y__nut", { timeout: 5_000 });
   // offsetHeight = chiều cao bố cục; getBoundingClientRect bị hiệu ứng phóng to của hộp thoại làm lệch.
   const goiY = await page.$eval(".tdd-goi-y__nut", (b) => ({ text: b.textContent, h: b.offsetHeight }));
-  assert.match(goiY.text, /CCTB01/);
+  // Gợi ý kèm tên + mã + khu + line để khỏi gắn nhầm thiết bị tên giống nhau.
+  assert.match(goiY.text, /LAF cân nguyên liệu/);
+  assert.match(goiY.text, /CCTB01 · Khu A2 · Cân chung · XSX/);
+  // Hạn lấy thẳng từ sheet: không còn ô chọn ngày.
+  assert.equal(await page.$('[role="dialog"] input[type="date"]'), null, "không còn ô chọn hạn");
+  assert.match(await page.$eval('[role="dialog"] .tdd-han', (el) => el.textContent), /30\/10\/2026/);
   assert.ok(goiY.h >= 44, `gợi ý phải đủ cao để chạm: ${goiY.h}`);
   await page.click(".tdd-goi-y__nut");
   await page.waitForFunction(() => [...document.querySelectorAll('[role="dialog"] .tdd-chip')]
@@ -168,7 +173,8 @@ try {
   await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: 10_000 });
   assert.deepEqual(may.saves[1].p_plan_item_ids, ["CCTB01/2026.01-OQ"]);
   assert.equal(may.saves[1].p_expected_version, 2);
-  await page.waitForFunction(() => [...document.querySelectorAll(".tdd-chip")].some((n) => n.textContent === "CCTB01"));
+  await page.waitForFunction(() => [...document.querySelectorAll(".tdd-chip")]
+    .some((n) => n.textContent === "CCTB01 · LAF cân nguyên liệu"));
 
   // 4. Lỗi xung đột: báo tại chỗ, nút Lưu không nhảy (chạm lần đầu trúng)
   await page.click('button[aria-label="Sửa CC-XSX-2605-001"]');

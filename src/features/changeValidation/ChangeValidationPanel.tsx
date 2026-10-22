@@ -35,6 +35,11 @@ function todayVn(): string {
   return dayFormatter.format(new Date());
 }
 
+/* "PCTB1305 · Khu B3 · TP sinh phẩm mới · XSX" — đủ để phân biệt các thiết bị tên giống nhau. */
+function objectDetail(o: ChangeObject): string {
+  return [o.code, o.area ? `Khu ${o.area}` : null, o.line, o.department?.toUpperCase()].filter(Boolean).join(" · ");
+}
+
 export default function ChangeValidationPanel() {
   const [data, setData] = useState<ChangeListResult | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -117,7 +122,9 @@ export default function ChangeValidationPanel() {
       id: "objects",
       header: "Thiết bị",
       cell: (row) => row.objects.length
-        ? <div className="tdd-chips">{row.objects.map((o) => <span key={o.code} className="tdd-chip">{o.code}</span>)}</div>
+        ? <div className="tdd-chips">{row.objects.map((o) => (
+            <span key={o.code} className="tdd-chip" title={objectDetail(o)}>{o.code}{o.name ? ` · ${o.name}` : ""}</span>
+          ))}</div>
         : <span className="rv-status rv-status--pending">Chưa gắn</span>,
     },
     {
@@ -258,7 +265,6 @@ function ChangeDialog({ row: liveRow, canEdit, canCreatePlan, onClose, onChanged
   const changedElsewhere = liveRow.version !== row.version;
   const [objects, setObjects] = useState<ChangeObject[]>(row.objects);
   const [planIds, setPlanIds] = useState<string[]>(row.planItems.filter((p) => p.linked).map((p) => p.id));
-  const [deadline, setDeadline] = useState(row.deadlineOverride ?? "");
   const [status, setStatus] = useState<ChangeHandlingStatus>(row.handlingStatus);
   const [note, setNote] = useState(row.note ?? "");
   const [busy, setBusy] = useState(false);
@@ -268,7 +274,6 @@ function ChangeDialog({ row: liveRow, canEdit, canCreatePlan, onClose, onChanged
   const savedCodes = row.objects.map((o) => o.code).join("|");
   const dirty = objects.map((o) => o.code).join("|") !== savedCodes
     || [...planIds].sort().join("|") !== row.planItems.filter((p) => p.linked).map((p) => p.id).sort().join("|")
-    || deadline !== (row.deadlineOverride ?? "")
     || status !== row.handlingStatus
     || note.trim() !== (row.note ?? "");
 
@@ -287,7 +292,8 @@ function ChangeDialog({ row: liveRow, canEdit, canCreatePlan, onClose, onChanged
         expectedVersion: row.version,
         objectCodes: objects.map((o) => o.code),
         planItemIds: planIds.filter((id) => visiblePlans.some((p) => p.id === id && chosen.has(p.objectCode))),
-        deadlineOverride: deadline || null,
+        // Hạn lấy thẳng từ sheet (chủ dự án chốt 22/10) — web không ghi hạn riêng.
+        deadlineOverride: null,
         handlingStatus: status,
         note: note.trim(),
       });
@@ -326,7 +332,6 @@ function ChangeDialog({ row: liveRow, canEdit, canCreatePlan, onClose, onChanged
         <div><dt>Nội dung thay đổi</dt><dd>{row.changeContent ?? "—"}</dd></div>
         <div><dt>Loại</dt><dd>{[row.changeClass, row.changeType].filter(Boolean).join(" · ") || "—"}</dd></div>
         <div><dt>Phòng ban · phụ trách</dt><dd>{[row.department, row.ownerText].filter(Boolean).join(" · ") || "—"}</dd></div>
-        <div><dt>Deadline trên sheet</dt><dd>{row.deadlineRaw ?? "—"}</dd></div>
         {row.removedFromSheetAt && (
           <div><dt>Sheet</dt><dd>Đã bỏ yêu cầu thẩm định lúc {formatBangkokShortDateTime(row.removedFromSheetAt)}</dd></div>
         )}
@@ -360,13 +365,13 @@ function ChangeDialog({ row: liveRow, canEdit, canCreatePlan, onClose, onChanged
       )}
 
       <div className="tdd-luoi">
-        <label className="cw-truong" htmlFor="tdd-han">
-          <span className="cw-nhan">Hạn thẩm định</span>
-          <input id="tdd-han" type="date" className="cw-o" value={deadline} disabled={!canEdit || busy}
-            min="2020-01-01" max="2100-12-31" onChange={(event) => setDeadline(event.target.value)} />
-          <span className="cw-nhe">{deadline ? "Hạn sửa trên web" : row.deadlineSheet
-            ? `Theo sheet: ${formatBangkokDate(row.deadlineSheet)}` : "Sheet chưa có ngày"}</span>
-        </label>
+        <div className="cw-truong">
+          <span className="cw-nhan">Hạn thẩm định (theo sheet)</span>
+          <b className="tdd-han">{row.deadlineSheet ? formatBangkokDate(row.deadlineSheet) : "Sheet chưa ghi ngày"}</b>
+          {row.deadlineRaw && row.deadlineRaw !== (row.deadlineSheet ? formatBangkokDate(row.deadlineSheet) : "") && (
+            <span className="cw-nhe">Sheet ghi: {row.deadlineRaw}</span>
+          )}
+        </div>
         <label className="cw-truong" htmlFor="tdd-trang-thai">
           <span className="cw-nhan">Trạng thái</span>
           <select id="tdd-trang-thai" className="cw-o" value={status} disabled={!canEdit || busy}
@@ -435,7 +440,7 @@ function ObjectPicker({ objects, canEdit, disabled, onChange }: {
       <div className="tdd-chips" aria-labelledby="tdd-thiet-bi-nhan">
         {objects.length === 0 && <span className="cw-nhe">Chưa gắn thiết bị nào.</span>}
         {objects.map((o) => (
-          <span key={o.code} className="tdd-chip" title={o.name ?? undefined}>
+          <span key={o.code} className="tdd-chip" title={objectDetail(o)}>
             {o.code}{o.name ? ` · ${o.name}` : ""}
             {canEdit && (
               <button type="button" className="tdd-chip__bo" disabled={disabled}
@@ -449,7 +454,7 @@ function ObjectPicker({ objects, canEdit, disabled, onChange }: {
       {canEdit && (
         <>
           <input className="cw-o" type="search" value={text} disabled={disabled} data-dialog-focus
-            aria-label="Gõ mã hoặc tên thiết bị" placeholder="Gõ mã hoặc tên thiết bị (ít nhất 2 ký tự)"
+            aria-label="Gõ mã hoặc tên thiết bị" placeholder="Tìm theo tên hoặc mã, gõ không dấu được (vd: tank 100)"
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && suggestions.length > 0) {
@@ -463,7 +468,7 @@ function ObjectPicker({ objects, canEdit, disabled, onChange }: {
               {suggestions.map((item) => (
                 <li key={item.code}>
                   <button type="button" className="tdd-goi-y__nut" disabled={disabled} onClick={() => add(item)}>
-                    <b>{item.code}</b><span>{[item.name, item.department].filter(Boolean).join(" · ")}</span>
+                    <b>{item.name ?? item.code}</b><span>{objectDetail(item)}</span>
                   </button>
                 </li>
               ))}
