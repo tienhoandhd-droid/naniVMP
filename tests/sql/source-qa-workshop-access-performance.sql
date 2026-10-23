@@ -49,7 +49,9 @@ begin
            coalesce(parent.node->'Plans','[]'::jsonb)
          ) child(node)
        )
-       select 1 from plan_node where node->>'Index Name'=p_index
+       -- p_index có thể là danh sách 'a|b': chỉ chấp nhận đúng các index nêu tên.
+       select 1 from plan_node
+       where node->>'Index Name'=any(string_to_array(p_index,'|'))
          and node->>'Node Type' in ('Index Scan','Index Only Scan','Bitmap Index Scan')
          and coalesce((node->>'Actual Loops')::integer,0)>0
      ) then
@@ -159,10 +161,11 @@ $body$),
     auth.uid(),p_search,p_cursor,p_limit,p_include_ids
   ) query_path
 $body$),
+  -- 20261017100000_qa_ho_tro_them.sql: QA thường thấy thêm đối tượng mình là QA hỗ trợ thêm (vmp_source_supporters).
   ('vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)',
    'query_path',
    'p_actor uuid, p_object_kind text, p_search text, p_filters jsonb, p_cursor jsonb, p_limit integer, p_include_inactive boolean, p_object_id uuid',
-   'TABLE(payload jsonb)','819079f0ec8d9e710cf3a9cebcdc3ccb7734ab21e8e4b23db6875488d3bf3bcf',$body$
+   'TABLE(payload jsonb)','71c18deeb206c08d4eb6c62d9d7555d48b92315f553788fbe88112b33705f0e2',$body$
 with actor as (
   select p_actor actor_id,public.vmp_business_role(p_actor) role_name,
          exists (
@@ -209,6 +212,17 @@ with actor as (
   join public.vmp_source_objects source_object
     on source_object.is_active is true
    and source_object.support_person_id=performer.id
+  union
+  select source_object.*
+  from actor
+  join public.vmp_performers performer
+    on actor.role_name='qa_staff'
+   and performer.user_id=actor.actor_id and performer.is_active
+  join public.vmp_source_supporters extra
+    on extra.performer_id=performer.id
+  join public.vmp_source_objects source_object
+    on source_object.is_active is true
+   and source_object.id=extra.source_object_id
 ), workshop_authorized as (
   select source_object.*
   from actor
@@ -327,8 +341,9 @@ select case
 end payload
 from actor cross join cursor_status
 $body$),
+  -- 20261017100000_qa_ho_tro_them.sql: QA hỗ trợ thêm được sửa tiến độ đối tượng đó.
   ('vmp_editable_progress_rights_path(uuid)','query_path','p_actor uuid',
-   'TABLE(payload jsonb)','81cd88d6aa2673f0bde59e94980d7e20acc075d95964a7f554b5dc3311af609c',$body$
+   'TABLE(payload jsonb)','d81b3fd023baf4e12d9817947b61e8fdce18415b9fe443c44f33ac807c1f498b',$body$
 with actor as (
   select public.vmp_business_role(p_actor) role_name,
          exists (
@@ -377,6 +392,15 @@ with actor as (
   join public.vmp_source_objects source_object
     on source_object.is_active is true
    and source_object.support_person_id=actor_person.person_id
+  where actor.role_name='qa_staff'
+  union
+  select source_object.object_code
+  from actor cross join actor_person
+  join public.vmp_source_supporters extra
+    on extra.performer_id=actor_person.person_id
+  join public.vmp_source_objects source_object
+    on source_object.is_active is true
+   and source_object.id=extra.source_object_id
   where actor.role_name='qa_staff'
 ), qa_resolved as (
   select item.validation_code,
@@ -475,10 +499,11 @@ select case
 end payload
 from actor
 $body$),
+  -- 20261016140000_qa_admin_assignable.sql (+20261016160000 danh sách): ứng viên QA = vmp_qa_assignable, gồm cả Admin.
   ('vmp_source_qa_candidates_page_path(uuid,text,jsonb,integer,uuid[])',
    'query_path',
    'p_actor uuid, p_search text, p_cursor jsonb, p_limit integer, p_include_ids uuid[]',
-   'TABLE(payload jsonb)','d6fb610656d4ee118db24cc1cf40609731794ce4b1f6546b59c0743cb625471a',$body$
+   'TABLE(payload jsonb)','39c471d641ec1c9a25b54f8523794ec98729474bd7f7a1f03deae0f741564ae1',$body$
 with actor as (
   select public.vmp_business_role(p_actor) role_name,
          exists (
@@ -509,9 +534,10 @@ with actor as (
   from public.vmp_performers performer
   join public.profiles profile on profile.id=performer.user_id
   where performer.is_active is true and performer.user_id is not null
-    and performer.access_class in ('qa_manager','qa_progress_editor')
+    and (performer.access_class in ('qa_manager','qa_progress_editor')
+         or public.vmp_business_role(profile.id) = 'admin')
     and coalesce(profile.is_active,true)
-    and public.vmp_business_role(profile.id) in ('qa_staff','qa_manager')
+    and public.vmp_qa_assignable(profile.id, performer.department)
     and (coalesce(btrim(p_search),'')=''
          or performer.normalized_full_name like
               public.vmp_source_scope_key(p_search)||'%')
@@ -539,7 +565,7 @@ with actor as (
   select requested.person_id,performer.performer_name,
          performer.normalized_full_name,performer.email,performer.department,
          coalesce(
-           public.vmp_business_role(performer.user_id) in ('qa_staff','qa_manager'),
+           public.vmp_qa_assignable(performer.user_id, performer.department),
            false
          ) eligible,
          case
@@ -547,9 +573,7 @@ with actor as (
            when not performer.is_active then 'PERFORMER_INACTIVE'
            when performer.user_id is null then 'ACCOUNT_UNLINKED'
            when not coalesce(profile.is_active,false) then 'ACCOUNT_DISABLED'
-           when public.vmp_business_role(performer.user_id)
-                not in ('qa_staff','qa_manager')
-             or public.vmp_business_role(performer.user_id) is null
+           when not coalesce(public.vmp_qa_assignable(performer.user_id, performer.department), false)
              then 'ROLE_INELIGIBLE'
            else null
          end ineligibility_reason
@@ -601,15 +625,15 @@ insert into expected_query_path_contract values
   ('rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)',
    'vmp_source_objects_page_path(uuid,text,text,jsonb,jsonb,integer,boolean,uuid)',
    '602434023178d4bae267ccb6c98697179ef1e569d57e12df0278a1c203add3fa',
-   '819079f0ec8d9e710cf3a9cebcdc3ccb7734ab21e8e4b23db6875488d3bf3bcf'),
+   '71c18deeb206c08d4eb6c62d9d7555d48b92315f553788fbe88112b33705f0e2'),
   ('rpc_my_editable_progress_rights()',
    'vmp_editable_progress_rights_path(uuid)',
    'd6848fa43fe2987da187e2d25857273126379d9d0720c4bccc955a5187f3ef7a',
-   '81cd88d6aa2673f0bde59e94980d7e20acc075d95964a7f554b5dc3311af609c'),
+   'd81b3fd023baf4e12d9817947b61e8fdce18415b9fe443c44f33ac807c1f498b'),
   ('rpc_source_qa_candidates(text,jsonb,integer,uuid[])',
    'vmp_source_qa_candidates_page_path(uuid,text,jsonb,integer,uuid[])',
    'd129ca77b7e5a62bed142bc1acf3970517692febcf3b53585f2be378c6a9488b',
-   'd6fb610656d4ee118db24cc1cf40609731794ce4b1f6546b59c0743cb625471a');
+   '39c471d641ec1c9a25b54f8523794ec98729474bd7f7a1f03deae0f741564ae1');
 
 with actual_function as (
   select expected.*,procedure.oid,procedure.proname,
@@ -693,6 +717,16 @@ insert into perf_people(rn,user_id)
 select series,md5('source-access-performance-user-'||series)::uuid
 from generate_series(1,1000) series;
 
+-- supabase/schema.sql (trigger chan_dang_ky_la, commit 2aed752): auth.users chỉ
+-- nhận email đã có trong vmp_email_cho_phep, nên duyệt email fixture trước.
+insert into public.vmp_email_cho_phep(email,ghi_chu)
+select format('source-perf-%s@example.test',rn),'source-access fixture'
+from perf_people
+union all
+select 'source-perf-'||suffix||'@example.test','source-access fixture'
+from unnest(array['inactive','unresolved']) suffix
+on conflict(email) do update set is_active=true;
+
 insert into auth.users(
   id,aud,role,email,encrypted_password,email_confirmed_at,
   raw_app_meta_data,raw_user_meta_data,created_at,updated_at
@@ -722,6 +756,15 @@ where performer.user_id=people.user_id;
 
 update perf_people people set performer_id=performer.id
 from public.vmp_performers performer where performer.user_id=people.user_id;
+
+-- 20261016160000_danh_sach_qa_phu_trach.sql: QA phụ trách/hỗ trợ phải có tên
+-- trong vmp_qa_phu_trach. Thêm QA manager (rn 1) và mọi QA thường (rn 4..1000)
+-- để tập ứng viên giống trước; người xưởng (rn 2,3) không thêm.
+insert into public.vmp_qa_phu_trach(performer_id,ghi_chu)
+select people.performer_id,'source-access fixture'
+from perf_people people
+where people.rn=1 or people.rn>=4
+on conflict(performer_id) do nothing;
 
 insert into auth.users(
   id,aud,role,email,encrypted_password,email_confirmed_at,
@@ -927,7 +970,11 @@ select pg_temp.assert_plan_contract(
   'SOURCE_ACCESS_PLAN_WORKSHOP_LINE_GRANTS');
 select pg_temp.assert_plan_contract(
   (select document from captured_plan where plan_name='item_rights_batch'),
-  'vmp_plan_items','idx_plan_obj',
+  -- Dữ liệu production đã vacuum (visibility map đầy) nên planner chọn lúc
+  -- idx_plan_obj, lúc Index Only Scan trên idx_vmp_plan_items_object_year_active
+  -- (index của 20260828140000_source_qa_workshop_access_expand.sql, cùng khoá
+  -- object_code). Cả hai đều là truy cập qua index; cấm Seq Scan vẫn giữ nguyên.
+  'vmp_plan_items','idx_plan_obj|idx_vmp_plan_items_object_year_active',
   'SOURCE_ACCESS_PLAN_ITEM_RIGHTS_BATCH');
 select pg_temp.assert_plan_contract(
   (select document from captured_plan where plan_name='item_rights_workshop'),
