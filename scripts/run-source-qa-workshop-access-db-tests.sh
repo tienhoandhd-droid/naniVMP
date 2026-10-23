@@ -736,7 +736,9 @@ fi
 
 run_behavior() {
   local sql_phase="$1"
+  # Clone dùng-một-lần: bật phần concurrency dblink (mặc định tắt trong file SQL).
   psql -X -v ON_ERROR_STOP=1 -v source_access_phase="$sql_phase" \
+    -v source_access_concurrency=on \
     -d "$test_database" -f "$repo_dir/tests/sql/source-qa-workshop-access.sql"
 }
 

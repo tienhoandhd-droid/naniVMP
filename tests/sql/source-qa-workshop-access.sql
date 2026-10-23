@@ -219,6 +219,14 @@ begin
 end
 $$;
 
+-- supabase/schema.sql (trigger chan_dang_ky_la, commit 2aed752): auth.users chỉ
+-- nhận email đã có trong vmp_email_cho_phep, nên duyệt email fixture trước.
+insert into public.vmp_email_cho_phep(email,ghi_chu)
+select 'source-access-'||suffix||'@example.test','source-access fixture'
+from unnest(array['admin','manager','owner','support','unrelated',
+                  'area-workshop','line-workshop','no-grant']) suffix
+on conflict(email) do update set is_active=true;
+
 insert into auth.users(
   id,aud,role,email,encrypted_password,email_confirmed_at,
   raw_app_meta_data,raw_user_meta_data,created_at,updated_at
@@ -271,6 +279,17 @@ set department=case when user_id between
     scope_area_ids='{}'::uuid[],scope_line_ids='{}'::uuid[],is_active=true
 where user_id between '9a010000-0000-4000-8000-000000000001'::uuid
                   and '9a010000-0000-4000-8000-000000000008'::uuid;
+
+-- 20261016160000_danh_sach_qa_phu_trach.sql: QA phụ trách/hỗ trợ phải có tên
+-- trong vmp_qa_phu_trach. Chỉ thêm bốn persona QA (2..5); Admin (1) cố ý
+-- KHÔNG có tên để vẫn là quan hệ không hợp lệ mà các assert dưới cần.
+insert into public.vmp_qa_phu_trach(performer_id,ghi_chu)
+select performer.id,'source-access fixture'
+from public.vmp_performers performer
+where performer.is_active
+  and performer.user_id between '9a010000-0000-4000-8000-000000000002'::uuid
+                            and '9a010000-0000-4000-8000-000000000005'::uuid
+on conflict(performer_id) do nothing;
 
 select pg_temp.assert_true(
   (select count(*) from public.vmp_performers
@@ -544,6 +563,116 @@ select pg_temp.assert_true(
    from pg_index index where index.indexrelid=
      'public.vmp_item_assignments_one_active_qa_person'::regclass),
   'SQA_EXISTING_ONE_ACTIVE_PRIMARY_AND_PERSON_INDEXES_PRESERVED');
+
+-- Khối dưới cần fixture "quan hệ cũ không hợp lệ" + persona viewer
+-- 71000000-…-0001. Runner (scripts/run-source-qa-workshop-access-db-tests.sh)
+-- COMMIT sẵn chúng vào clone trước expand; bản sao production không có nên
+-- `into strict` báo "query returned no rows". Tạo lại tại chỗ (rollback cùng
+-- bộ), mọi lệnh đều bỏ qua khi runner đã tạo.
+insert into public.vmp_email_cho_phep(email,ghi_chu)
+values ('source-ineligible-admin@example.test','source-access fixture'),
+       ('target-viewer-1@example.test','source-access fixture')
+on conflict(email) do update set is_active=true;
+
+insert into auth.users(
+  id,aud,role,email,encrypted_password,email_confirmed_at,
+  raw_app_meta_data,raw_user_meta_data,created_at,updated_at
+)
+values
+  ('9a060000-0000-4000-8000-000000000001','authenticated','authenticated',
+   'source-ineligible-admin@example.test','x',now(),'{}','{}',now(),now()),
+  ('71000000-0000-4000-8000-000000000001','authenticated','authenticated',
+   'target-viewer-1@example.test','x',now(),'{}','{}',now(),now())
+on conflict(id) do nothing;
+
+insert into public.profiles(id,full_name,email,role,department,is_active)
+values
+  ('9a060000-0000-4000-8000-000000000001','Source Ineligible Admin',
+   'source-ineligible-admin@example.test','admin'::public.user_role,'QA',true),
+  ('71000000-0000-4000-8000-000000000001','Target Viewer 1',
+   'target-viewer-1@example.test','viewer'::public.user_role,null,true)
+on conflict(id) do nothing;
+
+insert into public.vmp_performers(
+  id,performer_name,email,department,is_active,user_id,access_class
+)
+select '9a060000-0000-4000-8000-000000000002','Source Ineligible Admin',
+       'source-ineligible-admin@example.test','QA',true,
+       '9a060000-0000-4000-8000-000000000001','qa_progress_editor'
+where not exists (
+  select 1 from public.vmp_performers performer
+  where performer.user_id='9a060000-0000-4000-8000-000000000001'
+);
+-- Admin này cố ý KHÔNG có trong vmp_qa_phu_trach
+-- (20261016160000_danh_sach_qa_phu_trach.sql) để vẫn là QA không hợp lệ.
+update public.vmp_performers
+set performer_name='Source Ineligible Admin',
+    email='source-ineligible-admin@example.test', department='QA',
+    is_active=true, access_class='qa_progress_editor'
+where user_id='9a060000-0000-4000-8000-000000000001';
+
+insert into public.vmp_performers(
+  performer_name,email,department,is_active,user_id,access_class
+)
+select 'Source Ineligible Missing User','source-ineligible-missing@example.test',
+       'QA',true,null,'qa_progress_editor'
+where not exists (
+  select 1 from public.vmp_performers performer
+  where performer.email='source-ineligible-missing@example.test'
+);
+
+insert into public.vmp_objects(
+  code,name,classification,department,area,line,frequency_months
+)
+select 'SACCESS-INELIGIBLE','Source ineligible relation fixture','tb',
+       'QA','SACCESS_INELIGIBLE_AREA','SACCESS_INELIGIBLE_LINE',12
+where not exists (
+  select 1 from public.vmp_objects object where object.code='SACCESS-INELIGIBLE'
+);
+
+-- Quan hệ cũ có trước trigger kiểm QA hợp lệ: chèn ở chế độ replica để
+-- trigger vmp_source_objects_access_insert_projection không chặn, giống dữ
+-- liệu runner chèn trước expand.
+set local session_replication_role=replica;
+insert into public.vmp_source_objects(
+  id,object_kind,object_code,object_name,department,area_code,line,
+  validate_flag,frequency_months,report_class,workdays,first_month,year_ref,
+  source_tab,source_row,version,timeline_revision,timeline_applied_revision,
+  owner_person_id,owner_name,support_person_id,support_name
+)
+select '9a060000-0000-4000-8000-000000000101','Thiết bị',
+       'SACCESS-INELIGIBLE','Source ineligible relation fixture','QA',
+       'SACCESS_INELIGIBLE_AREA','SACCESS_INELIGIBLE_LINE','y',12,'Hóa lý',
+       5,1,2026,'source-access-ineligible',96010,1,0,0,
+       admin_performer.id,admin_performer.performer_name,
+       missing_performer.id,missing_performer.performer_name
+from public.vmp_performers admin_performer
+cross join public.vmp_performers missing_performer
+where admin_performer.user_id='9a060000-0000-4000-8000-000000000001'::uuid
+  and missing_performer.email='source-ineligible-missing@example.test'
+on conflict(id) do nothing;
+set local session_replication_role=origin;
+
+insert into public.vmp_plan_items(
+  id,validation_code,object_code,validation_type,year,report_class,effort_days,
+  deadline_protocol,deadline_validation,deadline_report,deadline_vmp,
+  status_protocol,status_validation,status_report,status_vmp,is_active,
+  item_state,version,departments,execution_departments,source_sheet_data,
+  owner_person_id,support_person_id,owner_name,secondary_owner
+)
+select 'SACCESS-INELIGIBLE/2026.01-PQ',
+       'SACCESS-INELIGIBLE/2026.01-PQ','SACCESS-INELIGIBLE','PQ',2026,
+       'Hóa lý',5,current_date+30,current_date+60,current_date+90,
+       current_date+120,'not_started','not_started','not_started','not_started',
+       true,'active',1,array['QA'],array['QA'],
+       '{"fixture":"source-access-ineligible"}'::jsonb,
+       admin_performer.id,missing_performer.id,
+       admin_performer.performer_name,missing_performer.performer_name
+from public.vmp_performers admin_performer
+cross join public.vmp_performers missing_performer
+where admin_performer.user_id='9a060000-0000-4000-8000-000000000001'::uuid
+  and missing_performer.email='source-ineligible-missing@example.test'
+on conflict(id) do nothing;
 
 do $ineligible_existing_relation$
 declare
@@ -1263,6 +1392,18 @@ exception when sqlstate 'P7777' then
 end
 $unrelated_save_keeps_ineligible_existing_selection$;
 
+-- Failpoint của rpc_save_catalog_object (20261016140000_qa_admin_assignable.sql)
+-- chỉ chạy khi có dấu five_role_test_fixture; clone của runner có sẵn dấu
+-- này, production thì không. Bật trong giao dịch rollback của bộ test.
+select current_user='authenticated' as saccess_was_authenticated \gset
+reset role;
+insert into public.system_config(key,value,description)
+values ('five_role_test_fixture','true'::jsonb,'source-access rollback-only marker')
+on conflict(key) do update set value=excluded.value;
+\if :saccess_was_authenticated
+set local role authenticated;
+\endif
+
 do $runtime_save_atomic_failure$
 declare
   v_source text;
@@ -1963,6 +2104,12 @@ select md5(coalesce(jsonb_agg(to_jsonb(assignment)
 from public.vmp_item_assignments assignment
 where assignment.assignment_kind='equipment_department'
 \gset
+-- rpc_update_progress gọi trước đó đặt app.audit_source='dashboard_rpc' tới
+-- hết giao dịch. Lệnh refresh thật chạy ở request service riêng (GUC chưa
+-- đặt). Trên dữ liệu production có hạng mục completed thiếu actual_vmp_date
+-- (enforce_plan_item_validation chỉ raise khi nguồn là dashboard_*), nên trả
+-- GUC về như request mới trước khi refresh toàn bảng.
+select set_config('app.audit_source','unknown',true);
 set local role service_role;
 select public.rpc_refresh_source_item_assignments() refresh_first
 \gset
@@ -2004,6 +2151,16 @@ select pg_temp.assert_true(
 \echo 'PASS BUSINESS Source QA owner/support workshop coverage atomic save refresh and immutability'
 rollback;
 
+-- Phần concurrency dưới đây COMMIT thật qua dblink tới clone cục bộ
+-- host.docker.internal:54322, nên mặc định TẮT. Chỉ bật bằng
+-- `-v source_access_concurrency=on` trên clone dùng-một-lần (runner
+-- scripts/run-source-qa-workshop-access-db-tests.sh bật sẵn). Không bật trên
+-- bản sao production dùng chung.
+\if :{?source_access_concurrency}
+\else
+\set source_access_concurrency off
+\endif
+\if :source_access_concurrency
 -- These dblink sessions use only the disposable local clone. They exercise
 -- both commit orders against the committed pre-expand repair fixture, because
 -- rows created by the rollback-only business transaction are intentionally not
@@ -2541,3 +2698,6 @@ from unnest(array[
 
 \echo 'PASS CONCURRENCY QA/workshop revocation and Source/plan deployment/runtime lock orders'
 rollback;
+\else
+\echo 'SKIP CONCURRENCY source_access_concurrency=off (dblink commit thật, chỉ chạy trên clone dùng-một-lần)'
+\endif

@@ -56,9 +56,11 @@ values
   ('rpc_commit_catalog_import(uuid,text)','v','manager_writer'),
   ('rpc_save_product_gmp(text,jsonb,text,integer)','v','manager_writer'),
   ('rpc_save_alert_recipient(uuid,jsonb,text,integer)','v','manager_writer'),
-  ('rpc_delete_source_row(text,integer)','v','manager_writer'),
-  ('rpc_upsert_source_row(text,integer,jsonb)','v','manager_writer'),
-  ('rpc_upsert_object(text,text,text,text,text,text,integer,text)','v','manager_writer'),
+  -- 20261021120000_va_bao_mat_ra_soat.sql: ba hàm ghi cũ (web không gọi nữa)
+  -- bị thu hồi EXECUTE của authenticated, chỉ còn service_role.
+  ('rpc_delete_source_row(text,integer)','v','service_writer'),
+  ('rpc_upsert_source_row(text,integer,jsonb)','v','service_writer'),
+  ('rpc_upsert_object(text,text,text,text,text,text,integer,text)','v','service_writer'),
   ('rpc_set_assignment(text,text,text,text,text)','v','rights_writer');
 
 update expected_browser_function set language_name='sql'
@@ -97,7 +99,8 @@ select pg_temp.assert_true(
        or not prosecdef or provolatile<>volatility or proparallel<>'u'
        or proisstrict or proleakproof
        or proconfig is distinct from array['search_path=public, pg_temp']
-       or not has_function_privilege('authenticated',oid,'EXECUTE')
+       or has_function_privilege('authenticated',oid,'EXECUTE')
+          is distinct from (classification<>'service_writer')
        or not has_function_privilege('service_role',oid,'EXECUTE')
        or has_function_privilege('anon',oid,'EXECUTE')
        or has_function_privilege('public',oid,'EXECUTE')
@@ -175,7 +178,11 @@ select pg_temp.assert_true(
 select pg_temp.assert_true(
   (select owner.rolname='postgres'
           and relation.relrowsecurity and not relation.relforcerowsecurity
-          and relation.relacl::text='{postgres=arwdDxtm/postgres}'
+          -- Không do migration: ACL chỉ-owner tường minh bằng đúng acldefault,
+          -- nên pg_dump không ghi lại và bản khôi phục để NULL (cùng nghĩa).
+          -- coalesce về acldefault thay vì nới điều kiện.
+          and coalesce(relation.relacl,acldefault('r',relation.relowner))::text
+              ='{postgres=arwdDxtm/postgres}'
    from pg_class relation
    join pg_roles owner on owner.oid=relation.relowner
    where relation.oid='public.vmp_legacy_action_map'::regclass)
@@ -480,6 +487,51 @@ select signature,'browser' from unnest(array[
   'vmp_can_view_source_object(uuid,uuid)','vmp_can_view_plan_item(uuid,text)'
 ]::text[]) signature
 on conflict(signature) do update set classification=excluded.classification;
+
+-- Hàm security definer đọc bảng được bảo vệ, thêm SAU bộ test gốc (28/08).
+-- Mỗi nhóm ghi migration tạo/định nghĩa lại; ACL kỳ vọng theo classification
+-- (browser = authenticated+service_role, service = chỉ service_role).
+create temp table expected_new_source_definer(
+  signature text primary key,
+  classification text not null,
+  migration text not null
+) on commit drop;
+insert into expected_new_source_definer(signature,classification,migration)
+values
+  ('rpc_team_overview_summary(integer)','browser',
+   '20260829150000_team_overview_summary / 20260831180000_close_true_policies'),
+  ('rpc_export_source_objects__manager_lock_impl_20260901(text,text,jsonb,jsonb,integer)','service',
+   '20260901090000_catalog_import_server_preview / 20261023120000_quyen_xem_mot_lan'),
+  ('rpc_confirm_revalidation_proposal(uuid,text,integer)','browser',
+   '20260901120000_revalidation_proposals / 20261021120000_va_bao_mat_ra_soat'),
+  ('rpc_refresh_revalidation_proposals(date)','browser',
+   '20260901120000_revalidation_proposals / 20261021120000_va_bao_mat_ra_soat'),
+  ('rpc_source_supporter_dat(text,uuid,boolean,text)','browser','20261017100000_qa_ho_tro_them'),
+  ('rpc_source_supporters(text)','browser','20261017100000_qa_ho_tro_them'),
+  ('rpc_change_create_plan_item(uuid,integer,text,text,integer)','browser','20261022100000_tham_dinh_do_thay_doi'),
+  ('rpc_change_list()','browser','20261022100000_tham_dinh_do_thay_doi'),
+  ('rpc_change_plan_badges()','browser','20261022100000_tham_dinh_do_thay_doi'),
+  ('rpc_change_save(uuid,integer,text[],text[],date,text,text)','browser','20261022100000_tham_dinh_do_thay_doi'),
+  ('vmp_change_can_view(uuid,uuid)','service','20261022100000_tham_dinh_do_thay_doi'),
+  ('vmp_change_record_json(uuid,uuid,boolean)','service',
+   '20261022100000_tham_dinh_do_thay_doi / 20261022150000_thay_doi_tim_thiet_bi'),
+  ('rpc_tro_ly_tra_loi(text,jsonb)','browser','20261023090000_tro_ly_vmp_moi'),
+  ('vmp_tl_danh_sach(uuid,text,jsonb)','service','20261023090000_tro_ly_vmp_moi'),
+  ('vmp_tl_ten_khop(uuid,text)','service','20261023090000_tro_ly_vmp_moi'),
+  ('vmp_tl_thay_doi(uuid,jsonb)','service','20261023090000_tro_ly_vmp_moi'),
+  ('vmp_tl_theo_nguoi(uuid,jsonb)','service','20261023090000_tro_ly_vmp_moi'),
+  ('vmp_tl_tien_do(uuid,jsonb)','service','20261023090000_tro_ly_vmp_moi'),
+  ('vmp_tl_tong_quan(uuid)','service','20261023090000_tro_ly_vmp_moi'),
+  ('vmp_tl_viec_cua_toi(uuid,jsonb)','service','20261023090000_tro_ly_vmp_moi'),
+  ('vmp_tl_hang_muc(uuid)','service',
+   '20261023090000_tro_ly_vmp_moi / 20261023120000_quyen_xem_mot_lan'),
+  ('vmp_tl_thiet_bi(uuid,jsonb)','service',
+   '20261023090000_tro_ly_vmp_moi / 20261023120000_quyen_xem_mot_lan'),
+  ('vmp_visible_source_ids(uuid)','service','20261023120000_quyen_xem_mot_lan');
+
+insert into expected_source_definer(signature,classification,expected_proconfig)
+select signature,classification,array['search_path=public, pg_temp']::text[]
+from expected_new_source_definer;
 
 update expected_source_definer
 set expected_proconfig=array['search_path=public, pg_temp']::text[]
@@ -1013,11 +1065,17 @@ select pg_temp.assert_true(
 drop function public.vmp_source_reader_inventory_canary();
 
 create temp table expected_protected_policy(
-  relation_name text primary key,policy_name text not null,command "char" not null,
+  relation_name text not null,policy_name text not null,command "char" not null,
   permissive boolean not null,roles text[] not null,
-  using_expression text not null,check_expression text
+  using_expression text not null,check_expression text,
+  primary key(relation_name,policy_name)
 ) on commit drop;
 insert into expected_protected_policy values
+  -- 20260929160000_opt_in_mfa_guard.sql: policy RESTRICTIVE chặn mọi lệnh khi
+  -- phiên chưa đạt MFA bắt buộc (chặt thêm, cộng với policy SELECT dưới).
+  ('vmp_plan_items','vmp_mfa_required','*',false,array['authenticated'],
+   '( SELECT vmp_mfa_session_allowed() AS vmp_mfa_session_allowed)',
+   '( SELECT vmp_mfa_session_allowed() AS vmp_mfa_session_allowed)'),
   ('vmp_source_objects','source_objects_authorized_select','r',true,
    array['authenticated'],
    'vmp_can_view_source_object(auth.uid(), id)',null),
@@ -1122,6 +1180,13 @@ select pg_temp.assert_true(
   and not has_any_column_privilege('authenticated','public.vmp_alert_recipients','UPDATE'),
   'SOURCE_ACCESS_NO_DIRECT_AUTHENTICATED_MUTATION');
 
+-- supabase/schema.sql (trigger chan_dang_ky_la, commit 2aed752): auth.users chỉ
+-- nhận email đã có trong vmp_email_cho_phep, nên duyệt email fixture trước.
+insert into public.vmp_email_cho_phep(email,ghi_chu)
+select 'source-security-'||suffix||'@example.test','source-access fixture'
+from unnest(array['qa','workshop','unrelated','manager','inactive']) suffix
+on conflict(email) do update set is_active=true;
+
 insert into auth.users(
   id,aud,role,email,encrypted_password,email_confirmed_at,
   raw_app_meta_data,raw_user_meta_data,created_at,updated_at
@@ -1177,6 +1242,16 @@ where user_id in (
   '9a020000-0000-4000-8000-000000000003'::uuid,
   '9a020000-0000-4000-8000-000000000004'::uuid
 );
+
+-- 20261016160000_danh_sach_qa_phu_trach.sql: QA phụ trách phải có tên trong
+-- vmp_qa_phu_trach. Thêm QA (…001) và QA manager (…004) của fixture.
+insert into public.vmp_qa_phu_trach(performer_id,ghi_chu)
+select performer.id,'source-access fixture'
+from public.vmp_performers performer
+where performer.is_active
+  and performer.user_id in ('9a020000-0000-4000-8000-000000000001'::uuid,
+                            '9a020000-0000-4000-8000-000000000004'::uuid)
+on conflict(performer_id) do nothing;
 
 update public.vmp_performers
 set id='9a020000-0000-4000-8000-000000000139',
@@ -1443,6 +1518,8 @@ declare
   v_dashboard jsonb;
   v_watermark jsonb;
   v_warnings jsonb;
+  v_can_export boolean:=coalesce(
+    public.vmp_business_role(p_user_id) in ('admin','qa_manager'),false);
 begin
   perform set_config('request.jwt.claims',json_build_object(
     'sub',p_user_id,'role','authenticated')::text,true);
@@ -1464,9 +1541,16 @@ begin
      or v_facets->>'ok' is distinct from 'true'
      or v_facets::text not like '%'||p_allowed_scope_marker||'%'
      or v_facets::text like '%SSEC_DENIED_AREA%'
-     or v_export->>'ok' is distinct from 'true'
-     or jsonb_array_length(v_export->'rows')<>1
-     or v_export#>>'{rows,0,object_code}' is distinct from p_allowed_code
+     -- 20260901090000_catalog_import_server_preview.sql: chỉ Admin/Quản lý QA
+     -- được xuất; vai khác phải bị FORBIDDEN (không lộ dòng nào).
+     or (v_can_export and (
+          v_export->>'ok' is distinct from 'true'
+          or jsonb_array_length(v_export->'rows')<>1
+          or v_export#>>'{rows,0,object_code}' is distinct from p_allowed_code))
+     or (not v_can_export and (
+          v_export->>'ok' is distinct from 'false'
+          or v_export->>'error_code' is distinct from 'FORBIDDEN'
+          or v_export ? 'rows'))
      or v_export::text like '%SSEC-DENIED%'
      or v_dashboard::text not like '%'||p_allowed_code||'%'
      or v_dashboard::text like '%SSEC-DENIED%'
@@ -1492,13 +1576,14 @@ begin
         p_rule_id,v_list,v_facets,v_export,v_dashboard,v_watermark,v_warnings);
   end if;
 
-  if not exists (
+  -- Có quyền xuất thì bắt buộc có audit EXPORT; bị từ chối thì không được có.
+  if exists (
     select 1 from public.audit_logs audit
     where audit.user_id=p_user_id and audit.action='EXPORT'
       and audit.table_name='vmp_source_objects'
-  ) then
+  ) is distinct from v_can_export then
     raise exception using errcode='check_violation',
-      message=p_rule_id||'_EXPORT_AUDIT_MISSING';
+      message=p_rule_id||'_EXPORT_AUDIT_MISMATCH';
   end if;
 end
 $$;
