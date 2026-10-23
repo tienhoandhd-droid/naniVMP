@@ -204,6 +204,10 @@ export default function CatalogWorkspaceShell({
     setExpandedId(null);
   }, [objQueryKey]);
 
+  /* Phụ thuộc GIÁ TRỊ cursor của trang đang xem, không phụ thuộc cả mảng:
+     layout effect trên luôn đặt lại bằng mảng mới, nên phụ thuộc mảng làm
+     mỗi lần mở màn/đổi lọc tải danh sách hai lần. */
+  const objCursorHienTai = objCursor.cursors[objCursor.page] ?? null;
   const taiDoiTuong = useCallback(async () => {
     const seq = ++objSeq.current;
     setObjState("loading");
@@ -213,7 +217,7 @@ export default function CatalogWorkspaceShell({
       objectKind: kind,
       search: objServerFilter.search,
       filters: objServerFilter.filters,
-      cursor: objCursor.cursors[objCursor.page] ?? null,
+      cursor: objCursorHienTai,
       limit: PAGE_SIZE,
     });
     if (seq !== objSeq.current) return;
@@ -230,7 +234,7 @@ export default function CatalogWorkspaceShell({
     setObjCursor((previous) => resolveCatalogSourceCursorPage(previous, result.nextCursor));
     setObjErr("");
     setObjState("ready");
-  }, [sourceAccessKey, hasAuthorizationRevision, kind, objCursor.cursors, objCursor.page, objServerFilter, vmpDateError]);
+  }, [sourceAccessKey, hasAuthorizationRevision, kind, objCursorHienTai, objServerFilter, vmpDateError]);
 
   useEffect(() => { taiDoiTuong(); }, [taiDoiTuong]);
 
@@ -276,8 +280,10 @@ export default function CatalogWorkspaceShell({
 
   const [coverageAreaLess, setCoverageAreaLess] = useState(0);
   const [coverageReadinessErr, setCoverageReadinessErr] = useState("");
+  /* Chỉ tab Phạm vi xưởng dùng số này — không tải ở các tab khác. */
+  const dangMoPhamVi = vung === "coverage";
   useEffect(() => {
-    if (!canManageWorkshopScope || !hasAuthorizationRevision) {
+    if (!dangMoPhamVi || !canManageWorkshopScope || !hasAuthorizationRevision) {
       setCoverageAreaLess(0);
       setCoverageReadinessErr("");
       return;
@@ -297,7 +303,7 @@ export default function CatalogWorkspaceShell({
       setCoverageReadinessErr("");
     });
     return () => { active = false; };
-  }, [canManageWorkshopScope, hasAuthorizationRevision, sourceAccessKey]);
+  }, [dangMoPhamVi, canManageWorkshopScope, hasAuthorizationRevision, sourceAccessKey]);
 
   /* Revision mất/đổi phải làm dữ liệu đang mở biến mất trước paint, đồng
      thời vô hiệu mọi page/facet response được mở dưới revision cũ. */

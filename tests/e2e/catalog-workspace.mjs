@@ -145,8 +145,9 @@ async function kiemTaoDoiTuongTheoVaiTro({ vaiTro, suaQuyen, ma }) {
   await trang.close();
 }
 
-async function moTrang(trinhDuyet, { hash = "source", rong = 1440, cao = 900, suaKho, isMobile = false } = {}) {
+async function moTrang(trinhDuyet, { hash = "source", rong = 1440, cao = 900, suaKho, isMobile = false, ngheRequest } = {}) {
   const trang = await trinhDuyet.newPage();
+  if (ngheRequest) trang.on("request", ngheRequest);
   const loiConsole = [];
   trang.on("console", (m) => {
     if (m.type() !== "error") return;
@@ -1418,6 +1419,29 @@ for (const scenario of LOI_AP_DUNG_V2) {
   kiem(state.dialogOpen && state.selected && state.reason && state.alert.includes("V2 chưa được triển khai"),
     "override bị chặn nhưng giữ nguyên bằng chứng người dùng đã nhập", JSON.stringify(state));
   kiem(chanNgoai.length === 0, "override bị chặn không gọi ra ngoài", chanNgoai[0] || "");
+  await trang.close();
+}
+
+/* ---- Mở Dữ liệu nguồn không gọi RPC thừa (23/10) -------------------------
+   Trước: danh sách đối tượng gọi 2 lần (đặt lại cursor bằng mảng mới làm
+   effect tải chạy lại) và facets toàn bộ (chỉ tab Phạm vi xưởng dùng) gọi ở
+   mọi tab. */
+{
+  const dem = {};
+  const { trang } = await moTrang(trinhDuyet, {
+    ngheRequest(req) {
+      const m = req.url().match(/\/rest\/v1\/rpc\/([a-z0-9_]+)/);
+      if (!m || req.method() !== "POST") return;
+      const ten = m[1] === "rpc_source_object_facets"
+        ? `${m[1]}(${JSON.parse(req.postData() || "{}").p_object_kind ?? "null"})` : m[1];
+      dem[ten] = (dem[ten] ?? 0) + 1;
+    },
+  });
+  kiem(dem.rpc_list_source_objects === 1, "mở màn chỉ tải danh sách đối tượng một lần", JSON.stringify(dem));
+  kiem(!dem["rpc_source_object_facets(null)"], "tab Đối tượng không tải facets toàn bộ", JSON.stringify(dem));
+  await trang.click('[data-cw-nav="coverage"]');
+  await cho(800);
+  kiem(dem["rpc_source_object_facets(null)"] === 1, "mở tab Phạm vi xưởng mới tải facets toàn bộ", JSON.stringify(dem));
   await trang.close();
 }
 
