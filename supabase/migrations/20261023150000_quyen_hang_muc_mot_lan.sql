@@ -224,11 +224,11 @@ with actor as (
            'scheduled_at'
          ]::text[] editable_fields,
          'Admin quản trị toàn hệ thống'::text view_reason
-  from actor
-  join public.vmp_plan_items item
-    on actor.role_name='admin' and actor.active_session
-   and item.is_active is true
-  where exists (
+  from public.vmp_plan_items item
+  -- Điều kiện vai đặt thành bộ lọc một lần: người không phải Admin không quét bảng.
+  where (select actor.role_name='admin' and actor.active_session from actor)
+    and item.is_active is true
+    and exists (
     select 1 from public.vmp_objects master_object
     where master_object.code=item.object_code
   )
@@ -366,3 +366,188 @@ select case
 end payload
 from actor
 $function$;
+
+-- Danh sách duyệt của hàm tự kiểm đứng yên từ 20260828150000: 18 hàm security
+-- definer thêm sau đó (đã rà 23/10 — đều kiểm vai/lọc quyền hoặc chỉ cấp
+-- service_role) cộng 2 hàm mới ở trên. Chỉ thêm dòng vào allowed, thân giữ nguyên.
+CREATE OR REPLACE FUNCTION public.vmp_unfiltered_security_definer_item_readers()
+ RETURNS TABLE(signature text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  with allowed(signature,reason) as (
+    values
+      ('audit_plan_item_changes()','owner trigger audit; no browser result'),
+      ('audit_plan_item_changes_v2()','owner trigger audit; no browser result'),
+      ('ly_do_khong_sua_duoc(text,uuid)','legacy field-rights helper'),
+      ('rpc_alert_context(text,integer)',
+       'service alert reader through the rights-filtered visible-item helper'),
+      ('vmp_item_rights(uuid,text)','target-item rights resolver'),
+      ('rpc_my_editable_progress_rights()','rights-filtered browser result'),
+      ('rpc_update_progress__assigned_impl_20260827(text,jsonb,text,jsonb,integer)',
+       'owner-only implementation behind the current rights writer'),
+      ('rpc_item_permission_preflight()','manager-only completeness check'),
+      ('rpc_luat_xem()','manager-only policy metadata'),
+      ('rpc_apply_assignments(boolean)','service assignment writer'),
+      ('rpc_apply_sheet_sync(text,text,jsonb)','service sync writer'),
+      ('rpc_create_plan_item(text,text,integer,integer,jsonb)',
+       'manager writer with Source-first locks'),
+      ('rpc_delete_plan_item(text,text)','manager soft-delete writer'),
+      ('rpc_generate_timeline(integer,boolean)','manager timeline writer'),
+      ('rpc_recalc_criticality(boolean)','manager criticality writer'),
+      ('rpc_reconcile_orphan_objects(text[])','service repair writer'),
+      ('rpc_refresh_computed_status()','service status writer'),
+      ('rpc_refresh_source_item_assignments()','service projection repair'),
+      ('rpc_register_alert(text,text,text,text,text,text,text)',
+       'service alert writer'),
+      ('rpc_resolve_missing(text,text,text)','manager missing-item writer'),
+      ('rpc_rollback_vmp_sheet_sync(uuid)','service rollback writer'),
+      ('rpc_set_item_assignment(uuid,text,text,text,text)',
+       'legacy assignment writer'),
+      ('rpc_set_item_performer(text,text)','legacy performer writer'),
+      ('rpc_item_assignments(text,uuid)','manager assignment reader'),
+      ('rpc_set_item_assignment(uuid,text,text,text,text,text,uuid)',
+       'manager assignment writer'),
+      ('rpc_set_item_performer_by_id(text,uuid,text)',
+       'manager performer writer through its reviewed owner delegate'),
+      ('rpc_upsert_source_object(text,text,jsonb)','service Source writer'),
+      ('rpc_set_item_state(text,text,text)','manager state writer'),
+      ('rpc_sync_vmp_sheet_snapshot(text,text,text,jsonb,jsonb)',
+       'service snapshot writer'),
+      ('rpc_sync_vmp_sheet_snapshot_with_extras(text,text,text,jsonb,jsonb)',
+       'service extended snapshot writer'),
+      ('rpc_update_progress(text,jsonb,text,jsonb,integer)',
+       'rights-filtered browser writer'),
+      ('rpc_active_rules()','manager-only catalog rules reader'),
+      ('rpc_apply_catalog_change(uuid,text,integer)',
+       'manager catalog writer with Source-first locks'),
+      ('rpc_preview_catalog_change(uuid)','manager-only pending preview'),
+      ('rpc_preview_item_rights(uuid,text)',
+       'manager-only explicit item-rights preview'),
+      ('rpc_apply_sheet_sync__source_impl_20260828(text,text,jsonb)',
+       'owner-only renamed sync implementation'),
+      ('rpc_rollback_vmp_sheet_sync__source_impl_20260828(uuid)',
+       'owner-only renamed rollback implementation'),
+      ('rpc_sync_vmp_sheet_snapshot__source_impl_20260828(text,text,text,jsonb,jsonb)',
+       'owner-only renamed snapshot implementation'),
+      ('vmp_exact_active_source_for_item(text)',
+       'owner-only exact Source relation resolver'),
+      ('vmp_guard_active_source_rekey()','owner trigger relation guard'),
+      ('vmp_guard_plan_master_rekey()','owner trigger master relation guard'),
+      ('vmp_reconcile_source_qa_projection(uuid)',
+       'owner-only projection reconciler'),
+      ('rpc_cleanup_orphan_source_assignment_resolutions(text)',
+       'service assignment repair writer'),
+      ('rpc_commit_catalog_import(uuid,text)',
+       'manager import writer with Source-first locks'),
+      ('rpc_delete_source_object(text,text,text)','service Source writer'),
+      ('rpc_export_source_objects(text,text,jsonb,jsonb,integer)',
+       'rights-filtered audited browser export'),
+      ('rpc_link_item_permission_account(uuid,uuid,text,integer)',
+       'manager account-link writer'),
+      ('rpc_list_source_objects(text,text,jsonb,jsonb,integer,boolean,uuid)',
+       'rights-filtered browser Source reader'),
+      ('rpc_resolve_source_item_assignment(uuid,uuid,text)',
+       'service assignment resolution writer'),
+      ('rpc_save_catalog_object(text,text,jsonb,text,integer)',
+       'manager Source writer with atomic access projection'),
+      ('rpc_set_source_workshop_scope_grant(uuid,uuid,text,text,text,boolean,text,integer)',
+       'manager coverage writer with reason and version checks'),
+      ('rpc_source_field_suggestions(text,text,text,jsonb,integer)',
+       'manager-only bounded Source suggestions'),
+      ('rpc_source_object_facets(text,jsonb)',
+       'rights-filtered bounded Source facets'),
+      ('rpc_source_workshop_scope_choices(text,text,text,jsonb,integer)',
+       'manager-only coverage tuple reader'),
+      ('rpc_stage_catalog_import(text,text,text,text,jsonb)',
+       'manager-only import staging writer'),
+      ('vmp_can_view_source_object(uuid,uuid)',
+       'current-actor exact Source predicate with alternate-UID defense'),
+      ('vmp_enforce_active_plan_source_relation()',
+       'owner trigger enforcing exact active Source relation'),
+      ('vmp_lock_source_plan_relations(text[])',
+       'owner-only global Source-first lock helper'),
+      ('vmp_set_item_assignment_unhardened(uuid,text,text,text,text)',
+       'owner-only implementation behind reviewed assignment writers'),
+      ('vmp_source_workshop_scope_match(uuid,uuid)',
+       'private workshop Source predicate'),
+      ('vmp_sync_item_assignments_from_performer()',
+       'owner trigger synchronization writer'),
+      ('vmp_upsert_source_object_before_person_id(text,text,jsonb)',
+       'owner-only legacy Source writer implementation'),
+      ('rpc_get_vmp_dashboard(integer,boolean,boolean)',
+       'rights-filtered visible-Source dashboard'),
+      ('rpc_get_vmp_watermark(integer)',
+       'rights-filtered visible-Source cache watermark'),
+      ('rpc_source_warnings(integer)',
+       'rights-filtered visible-Source warnings'),
+      ('vmp_visible_plan_items()',
+       'rights-filtered current-actor item relation'),
+      ('rpc_catalog_history(jsonb,integer,integer)',
+       'admin/qa_manager-only catalog audit history (20260824120000, 20261008150000)'),
+      ('rpc_catalog_history_detail(uuid)',
+       'admin/qa_manager-only catalog audit detail (20260824120000, 20261008150000)'),
+      ('rpc_change_create_plan_item(uuid,integer,text,text,integer)',
+       'QA editor plus edit_catalog gate (20261022100000)'),
+      ('rpc_change_plan_badges()',
+       'QA roles see all; others filtered by vmp_can_view_plan_item (20261022100000)'),
+      ('rpc_change_save(uuid,integer,text[],text[],date,text,text)',
+       'vmp_change_can_edit: admin/qa_manager/qa_staff only (20261022100000)'),
+      ('rpc_check_data_quality(integer)',
+       'rights-filtered visible-item quality checks (20261021120000, 20261023150000)'),
+      ('rpc_confirm_revalidation_proposal(uuid,text,integer)',
+       'vmp_can_manage_revalidation: admin/qa_manager (20260901120000)'),
+      ('rpc_due_alerts(integer,integer)',
+       'rights-filtered visible-item due alerts (20261021120000, 20261023150000)'),
+      ('rpc_export_source_objects__manager_lock_impl_20260901(text,text,jsonb,jsonb,integer)',
+       'owner-only export implementation behind manager lock (20260901090000)'),
+      ('rpc_refresh_revalidation_proposals(date)',
+       'vmp_can_manage_revalidation: admin/qa_manager (20260901120000)'),
+      ('rpc_source_supporter_dat(text,uuid,boolean,text)',
+       'vmp_can_manage_source_qa_assignment gate (20261017100000)'),
+      ('rpc_source_supporters(text)',
+       'vmp_can_view_source_object gate (20261017100000)'),
+      ('rpc_team_overview_summary(integer)',
+       'overview screen gate, counts through vmp_visible_plan_items (20260829150000, 20260831180000)'),
+      ('vmp_can_view_item_codes(uuid)',
+       'service-only set form of vmp_can_view_item (20261023150000)'),
+      ('vmp_can_view_plan_item_codes(uuid)',
+       'service-only set form of vmp_can_view_plan_item (20261023150000)'),
+      ('vmp_change_can_view(uuid,uuid)',
+       'service-only change-request visibility helper (20261022100000)'),
+      ('vmp_change_record_json(uuid,uuid,boolean)',
+       'service-only change-request projection (20261022100000, 20261022150000)'),
+      ('vmp_tl_hang_muc(uuid)',
+       'service-only assistant tool, filtered by caller rights (20261023090000)'),
+      ('vmp_tl_thiet_bi(uuid,jsonb)',
+       'service-only assistant tool, filtered by caller rights (20261023090000)'),
+      ('vmp_visible_source_ids(uuid)',
+       'service-only set form of vmp_can_view_source_object (20261023120000)'),
+      ('vmp_unfiltered_security_definer_item_readers()',
+       'service-only executable inventory; self-reference is audited')
+  ), candidates as (
+    select case
+      when procedure.proname like '%\_\_five\_role\_impl\_20260824' escape '\'
+        then format('%s(%s)',left(procedure.proname,
+          -length('__five_role_impl_20260824')),
+          replace(pg_catalog.oidvectortypes(procedure.proargtypes),', ',','))
+      else procedure.oid::regprocedure::text
+    end signature
+    from pg_proc procedure
+    join pg_namespace namespace on namespace.oid=procedure.pronamespace
+    where namespace.nspname='public' and procedure.prosecdef
+      and (pg_get_functiondef(procedure.oid) ilike '%vmp_source_objects%'
+        or pg_get_functiondef(procedure.oid) ilike '%vmp_plan_items%'
+        or pg_get_functiondef(procedure.oid) ilike '%vmp_item_assignments%')
+  )
+  select candidate.signature
+  from candidates candidate
+  left join allowed on allowed.signature=candidate.signature
+  where allowed.signature is null
+  order by candidate.signature
+$function$;
+revoke all on function public.vmp_unfiltered_security_definer_item_readers()
+  from public,anon,authenticated;
+grant execute on function public.vmp_unfiltered_security_definer_item_readers()
+  to service_role;

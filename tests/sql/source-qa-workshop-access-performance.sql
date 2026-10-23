@@ -342,29 +342,42 @@ end payload
 from actor cross join cursor_status
 $body$),
   -- 20261017100000_qa_ho_tro_them.sql: QA hỗ trợ thêm được sửa tiến độ đối tượng đó.
+  -- 20261023150000_quyen_hang_muc_mot_lan.sql: nhánh Admin tính một lần cho cả tập.
   ('vmp_editable_progress_rights_path(uuid)','query_path','p_actor uuid',
-   'TABLE(payload jsonb)','d81b3fd023baf4e12d9817947b61e8fdce18415b9fe443c44f33ac807c1f498b',$body$
+   'TABLE(payload jsonb)','d39e364bb9f82832b4292df4ac8193b36134863a1029b1a2eb09d5a037879990',$body$
 with actor as (
   select public.vmp_business_role(p_actor) role_name,
          exists (
            select 1 from public.profiles profile
            where profile.id=p_actor and coalesce(profile.is_active,true)
-         ) active_account
+         ) active_account,
+         public.vmp_is_active_session(p_actor) active_session
 ), actor_person as (
   select performer.id person_id
   from actor
   join public.vmp_performers performer
     on performer.user_id=p_actor and performer.is_active
 ), admin_resolved as (
-  select item.validation_code,rights.editable_fields,rights.view_reason
-  from actor
-  join public.vmp_plan_items item
-    on actor.role_name='admin' and item.is_active is true
-  cross join lateral public.vmp_item_rights(
-    p_actor,item.validation_code
-  ) rights
-  where rights.can_view
-    and cardinality(coalesce(rights.editable_fields,'{}'::text[]))>0
+  -- 23/10: viết dạng tập hợp đúng kết quả vmp_item_rights cho Admin
+  -- (vmp_item_rights_before_canonical_scope): mọi hạng mục hoạt động có
+  -- vmp_objects khớp, 9 trường, cùng lý do.
+  select item.validation_code,
+         array[
+           'actual_protocol_date','status_protocol',
+           'actual_validation_date','status_validation',
+           'actual_report_date','status_report',
+           'actual_vmp_date','status_vmp',
+           'scheduled_at'
+         ]::text[] editable_fields,
+         'Admin quản trị toàn hệ thống'::text view_reason
+  from public.vmp_plan_items item
+  -- Điều kiện vai đặt thành bộ lọc một lần: người không phải Admin không quét bảng.
+  where (select actor.role_name='admin' and actor.active_session from actor)
+    and item.is_active is true
+    and exists (
+    select 1 from public.vmp_objects master_object
+    where master_object.code=item.object_code
+  )
 ), qa_manager_resolved as (
   select item.validation_code,
          array[
@@ -629,7 +642,7 @@ insert into expected_query_path_contract values
   ('rpc_my_editable_progress_rights()',
    'vmp_editable_progress_rights_path(uuid)',
    'd6848fa43fe2987da187e2d25857273126379d9d0720c4bccc955a5187f3ef7a',
-   'd81b3fd023baf4e12d9817947b61e8fdce18415b9fe443c44f33ac807c1f498b'),
+   'd39e364bb9f82832b4292df4ac8193b36134863a1029b1a2eb09d5a037879990'),
   ('rpc_source_qa_candidates(text,jsonb,integer,uuid[])',
    'vmp_source_qa_candidates_page_path(uuid,text,jsonb,integer,uuid[])',
    'd129ca77b7e5a62bed142bc1acf3970517692febcf3b53585f2be378c6a9488b',

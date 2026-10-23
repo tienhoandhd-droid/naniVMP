@@ -527,7 +527,9 @@ values
    '20261023090000_tro_ly_vmp_moi / 20261023120000_quyen_xem_mot_lan'),
   ('vmp_tl_thiet_bi(uuid,jsonb)','service',
    '20261023090000_tro_ly_vmp_moi / 20261023120000_quyen_xem_mot_lan'),
-  ('vmp_visible_source_ids(uuid)','service','20261023120000_quyen_xem_mot_lan');
+  ('vmp_visible_source_ids(uuid)','service','20261023120000_quyen_xem_mot_lan'),
+  ('vmp_can_view_item_codes(uuid)','service','20261023150000_quyen_hang_muc_mot_lan'),
+  ('vmp_can_view_plan_item_codes(uuid)','service','20261023150000_quyen_hang_muc_mot_lan');
 
 insert into expected_source_definer(signature,classification,expected_proconfig)
 select signature,classification,array['search_path=public, pg_temp']::text[]
