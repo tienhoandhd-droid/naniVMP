@@ -53,6 +53,10 @@ test('calibration warning compares due date with applicable point dates and neve
  assert.deepEqual(plain(history.calibrationWarnings(config,data,'air','bm01','A1')),[]);
  assert.deepEqual(plain(history.calibrationWarnings(config,data,'air','bm01','A2')),[{key:'air:bm01:expiry',name:'Máy đếm',due_on:'2026-09-28',measured_on:'2026-09-29'}]);
  assert.deepEqual(plain(history.calibrationWarnings(config,{forms:{bm01:{A3:{p05:'2'}}}},'air','bm01','A3')),[]);
+ // Giờ tự ghi lúc lưu: so phần ngày; cùng ngày hết hạn không cảnh báo, qua ngày thì cảnh báo.
+ const stamped={forms:{bm01:{A4:{execution_date:'2026-09-28T16:30:00+07:00'},A5:{execution_date:'2026-09-29T08:05:00+07:00'}}}};
+ assert.deepEqual(plain(history.calibrationWarnings(config,stamped,'air','bm01','A4')),[]);
+ assert.deepEqual(plain(history.calibrationWarnings(config,stamped,'air','bm01','A5')),[{key:'air:bm01:expiry',name:'Máy đếm',due_on:'2026-09-28',measured_on:'2026-09-29'}]);
 });
 
 test('open runs sync mapped calibration dates into the draft while closed runs remain untouched',()=>{

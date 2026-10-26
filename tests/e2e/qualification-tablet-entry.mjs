@@ -44,6 +44,7 @@ const recordData=id=>{
  return {system:'air',meta:{},equipment:{bm01:{expiry:id==='${closed.items[0].record_id}'?'2026-08-01':'2026-09-26'}},forms:{bm01:{[point]:{p05:'12',p5:'',executed_by:'QA',execution_date:'2026-09-27'}}},controls:{positive_count:'',executed_by:'',result_date:''},trend:{}};
 };
 window.CPC1Backend={
+ checkDraftAccess:async()=>{},
  capabilities:{persistence:true,auth:true},mode:'cloud',permissions:{can_view:true,can_enter:true},
  permissionsFor:()=>({can_view:true,can_view_current:true,can_enter:true}),
  canSaveActive:()=>selectedRun()?.status==='open',canEvaluateActive:()=>selectedRun()?.status==='open',
@@ -169,10 +170,8 @@ try {
  assert.equal(await cell(second,'p05').getAttribute('enterkeyhint'),'next');
  await guard.keyboard.type('-3');await guard.keyboard.press('Enter');
  assert.equal(await guard.evaluate(()=>document.activeElement?.name),`forms.bm01.${second}.p5`,'Enter moves to the next field');
- await cell(second,'execution_date').fill('2019-05-01');await cell(second,'execution_date').blur();
- assert.match(await guard.locator(`#${await cell(second,'execution_date').getAttribute('id')}-error`).textContent(),/2020/,'old date is flagged beside the field');
- assert.equal(await cell(second,'execution_date').getAttribute('min'),'2020-01-01');
- await cell(second,'execution_date').fill('');
+ // Người thực hiện + thời gian do máy chủ tự ghi lúc lưu: chỉ hiển thị, không nhập tay.
+ for(const key of ['executed_by','execution_date']){assert.equal(await cell(second,key).evaluate(n=>n.readOnly),true,key+' is stamped by the server');assert.equal(await cell(second,key).getAttribute('placeholder'),'Tự ghi khi lưu');}
  await guard.locator('#record-save').click();
  await guard.locator('#error-summary').getByText('Còn 2 ô cần sửa.').waitFor();
  assert.equal(await guard.evaluate(()=>window.__fixture.saveCalls?.length||0),0,'invalid input is not sent');
@@ -205,14 +204,18 @@ try {
  await guard.locator('#record-save-retry').click();
  await guard.locator('#record-state').getByText(/^Đã lưu lúc/).waitFor();
  assert.equal(await guard.locator('#record-save-retry').isHidden(),true);
- await cell(second,'execution_date').fill('2026-09-28');
- await guard.evaluate(p=>{window.__fixture.rejectCells=[{path:['forms','bm01',p,'execution_date'],reason:'Ngày đo sau ngày đóng đợt'}];},second);
+ await guard.locator('#entry-change').click();
+ await cell(second,'p5').fill('1');
+ await guard.evaluate(p=>{window.__fixture.rejectCells=[{path:['forms','bm01',p,'p5'],reason:'Số đo sau ngày đóng đợt'}];},second);
  await guard.locator('#record-save').click();
+ await guard.locator('#correction-reason-dialog[open]').waitFor();
+ await guard.locator('#correction-reason').fill('Đính chính theo phiếu');
+ await guard.locator('#correction-reason-dialog button[type="submit"]').click();
  await guard.locator('#message').getByText(/Tải lại trước khi lưu\. Dữ liệu/).waitFor();
  assert.doesNotMatch(await guard.locator('#message').textContent(),/\.\./,'no doubled full stop');
- assert.equal(await cell(second,'execution_date').getAttribute('aria-invalid'),'true','server-listed field is marked');
- assert.match(await guard.locator(`#${await cell(second,'execution_date').getAttribute('id')}-error`).textContent(),/sau ngày đóng đợt/);
- assert.equal(await cell(second,'execution_date').inputValue(),'2026-09-28');
+ assert.equal(await cell(second,'p5').getAttribute('aria-invalid'),'true','server-listed field is marked');
+ assert.match(await guard.locator(`#${await cell(second,'p5').getAttribute('id')}-error`).textContent(),/sau ngày đóng đợt/);
+ assert.equal(await cell(second,'p5').inputValue(),'1');
  // Tính thử bị máy chủ chặn (PT422, details = JSON issues): đánh dấu đúng ô, giữ số đang nhập.
  await guard.evaluate(p=>{GasAPI.evaluate=async()=>{throw Object.assign(Error('Còn 1 ô nhập sai — sửa trước khi tính'),{code:'PT422',hint:'INVALID_INPUT',details:JSON.stringify({code:'INVALID_INPUT',issues:[{path:['forms','bm01',p,'p5'],field:'p5',value:'2',rule:'evaluation_invalid',reason:'Máy chủ không tính được ô này'}]})});};},second);
  await guard.locator('#evaluate').click();
@@ -282,6 +285,31 @@ try {
  assert.match(shown,new RegExp(`${air.forms[0].locations[0].name}.*Tiểu phân ≥ 5,0 µm`),'point name and form field label');
  assert.equal(await raw.locator(`[name="forms.bm01.${point}.p5"]`).getAttribute('aria-invalid'),'true');
  await raw.close();
+ // Sau khi lưu: trang hiện ngay tên tài khoản + giờ lưu do máy chủ ghi (dd/mm/yyyy HH:mm).
+ const stampPage=await localPage();await stampPage.setViewportSize({width:1024,height:768});
+ await stampPage.goto(`http://qualification.test/tham-dinh-thuc-te/gas.html?system=air&form=bm01&run=${open.id}&record=${open.items[0].record_id}`);
+ await stampPage.locator('#entry-continue').click();
+ await stampPage.evaluate(p=>{GasAPI.save=async(data,options)=>{const out=structuredClone(data);out.forms.bm01[p]={...out.forms.bm01[p],executed_by:'Nguyễn Văn Thử',execution_date:'2026-10-26T09:42:05+07:00'};return {id:options.recordId,version:(options.expectedVersion||0)+1,data:out,evaluation:{forms:{}}};};},point);
+ await stampPage.locator(`[name="forms.bm01.${point}.p5"]`).fill('0');
+ await stampPage.locator('#record-save').click();
+ await stampPage.locator('#message').getByText(/Đã lưu hồ sơ\./).waitFor();
+ assert.equal(await stampPage.locator(`[name="forms.bm01.${point}.executed_by"]`).inputValue(),'Nguyễn Văn Thử','performer shows the account name after saving');
+ assert.equal(await stampPage.locator(`[name="forms.bm01.${point}.execution_date"]`).inputValue(),'26/10/2026 09:42','time shows date and time after saving');
+ await stampPage.close();
+ // Tự lưu tạm mặc định bật: gõ là lưu trên máy, không cần tích ô hay bấm Lưu; mở lại trang thì khôi phục được.
+ const fresh=await browser.newContext({viewport:{width:1024,height:768}});
+ const auto=await localPage(fresh);
+ await auto.goto(`http://qualification.test/tham-dinh-thuc-te/gas.html?system=air&form=bm01&run=${open.id}&record=${open.items[0].record_id}`);
+ await auto.locator('#entry-continue').click();
+ assert.equal(await auto.locator('#local-draft-enable').isChecked(),true,'device autosave is on by default');
+ await auto.locator(`[name="forms.bm01.${point}.p5"]`).fill('7');
+ await auto.locator('#local-draft-status').getByText(/Đã lưu tạm trên máy/).waitFor();
+ await auto.reload();await auto.locator('#entry-continue').click();
+ await auto.locator('#local-draft-restore').waitFor();
+ await auto.locator('#local-draft-restore').click();
+ await auto.waitForFunction(p=>document.querySelector(`[name="forms.bm01.${p}.p5"]`)?.value==='7'||/Không khôi phục/.test(document.getElementById('local-draft-status').textContent),point);
+ assert.equal(await auto.locator(`[name="forms.bm01.${point}.p5"]`).inputValue(),'7',await auto.locator('#local-draft-status').textContent());
+ await fresh.close();
  assert.deepEqual(reviewFailures,[]);
  assert.deepEqual(errors,[]);console.log('qualification tablet entry: PASS');
 }finally{await browser.close();}

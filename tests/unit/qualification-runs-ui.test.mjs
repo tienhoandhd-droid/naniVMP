@@ -107,3 +107,24 @@ test('dedicated trend route pins one system and closed multi-run series never cr
  ];
  assert.deepEqual(plain(ui.closedTrendHistory(history,runs,'air')),[{run_id:'r1',system:'air',period:'2026-03-01'}]);
 });
+
+test('air and nitrogen share one device entry per form field; steam and nitrogen-only fields stay separate', () => {
+  const req = (system, form, field, name, kind = 'calibration') => ({ key: `${system}:${form}:${field}`, system, form, name, kind });
+  const requirements = [req('steam', 'bm01', 'device', 'Thiết bị đo khí không ngưng tụ'), req('air', 'bm01', 'expiry', 'Tiểu phân'), req('air', 'bm03', 'expiry', 'Vết dầu', 'expiry'),
+    req('nitrogen', 'bm01', 'expiry', 'Tiểu phân'), req('nitrogen', 'bm03', 'expiry', 'Vết dầu', 'expiry'), req('nitrogen', 'bm05', 'expiry', 'Độ tinh khiết')];
+  assert.deepEqual(plain(ui.calibrationGroups(requirements).map(g => g.keys)), [
+    ['steam:bm01:device'], ['air:bm01:expiry', 'nitrogen:bm01:expiry'], ['air:bm03:expiry', 'nitrogen:bm03:expiry'], ['nitrogen:bm05:expiry']
+  ]);
+  const differing = { 'air:bm01:expiry': { name: 'A', due_on: '2026-12-01' }, 'nitrogen:bm01:expiry': { name: 'B', due_on: '2026-12-01' } };
+  assert.equal(ui.calibrationGroups(requirements.slice(1, 4), differing).length, 3, 'saved runs with different devices keep separate rows');
+});
+
+test('single-use expiry carries over from the latest run of the same year while still valid', () => {
+  const item = system => ({ key: `${system}:bm03:expiry`, system, form: 'bm03', name: 'Vết dầu', kind: 'expiry' });
+  const calibrationItem = { key: 'air:bm01:expiry', system: 'air', form: 'bm01', name: 'Tiểu phân', kind: 'calibration' };
+  const run = (title, started_on, due_on) => ({ title, started_on, calibration_requirements: [item('nitrogen')], calibration: { 'nitrogen:bm03:expiry': { name: 'Ống Dräger', due_on } } });
+  const runs = [run('Tháng 3', '2026-03-02', '2026-12-31'), run('Tháng 1', '2026-01-05', '2026-06-30'), run('Năm trước', '2025-11-01', '2027-01-31')];
+  assert.deepEqual(plain(ui.carriedExpiry([item('air'), calibrationItem], runs, '2026-10-26')), { 'air:bm03:expiry': { name: 'Ống Dräger', due_on: '2026-12-31', from: 'Tháng 3' } });
+  assert.deepEqual(plain(ui.carriedExpiry([item('air')], runs, '2027-01-10')), {}, 'a new year asks again');
+  assert.deepEqual(plain(ui.carriedExpiry([item('air')], [runs[1]], '2026-10-26')), {}, 'expired values are not reused');
+});

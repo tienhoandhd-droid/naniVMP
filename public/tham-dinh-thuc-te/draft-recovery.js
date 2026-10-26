@@ -22,14 +22,14 @@
   function panel() {
     if ($('local-draft-panel')) return;
     const section = document.createElement('section');section.id='local-draft-panel';section.className='local-draft-panel';section.setAttribute('aria-label','Bản tạm trên máy');
-    section.innerHTML='<div class="draft-switch"><label><input id="local-draft-enable" type="checkbox" aria-describedby="local-draft-help"> Lưu tạm trên máy này</label><span id="local-draft-status" role="status">Chưa bật lưu tạm</span></div><p id="local-draft-help">Chỉ bật trên máy cá nhân: bản tạm không mã hoá, mất khi đăng xuất hoặc xoá dữ liệu trình duyệt.</p><div class="draft-recovery-actions"><button id="local-draft-restore" type="button" hidden>Khôi phục bản đang nhập</button><button id="local-draft-clear" type="button" hidden>Xóa bản tạm trên máy</button></div>';
+    section.innerHTML='<div class="draft-switch"><label><input id="local-draft-enable" type="checkbox" aria-describedby="local-draft-help"> Tự lưu tạm trên máy này</label><span id="local-draft-status" role="status">Tự lưu tạm đang bật</span></div><p id="local-draft-help">Nhập đến đâu lưu tạm đến đó; bấm Lưu để đưa lên hệ thống. Bản tạm không mã hoá, tự xoá khi đăng xuất — máy dùng chung nên tắt.</p><div class="draft-recovery-actions"><button id="local-draft-restore" type="button" hidden>Khôi phục bản đang nhập</button><button id="local-draft-clear" type="button" hidden>Xóa bản tạm trên máy</button></div>';
     document.querySelector('.action-bar, .actionbar').after(section);
     $('local-draft-enable').addEventListener('change', async () => {
       if (!active || !allowed()) return;
-      if (!$('local-draft-enable').checked) { await discard(); return; }
+      if (!$('local-draft-enable').checked) { await discard(false); return; }
       active.enabled=true;sync();await flush(true);
     });
-    $('local-draft-clear').addEventListener('click',discard);
+    $('local-draft-clear').addEventListener('click',()=>discard(true));
     $('local-draft-restore').addEventListener('click', async () => {
       const a=active;if(!a?.candidate || !allowed())return;
       if(adapter.get().dirty && !confirm('Thay dữ liệu đang trên trang bằng bản tạm đã lưu trên máy?'))return;
@@ -55,8 +55,9 @@
     try {
       const row=await store.read(scope,storageSystem(state));
       if(active!==a || a.ended || !allowed())return;
-      a.revision=row?.revision || 0;a.enabled=Boolean(row?.enabled);a.candidate=row?.payload || null;
-      status(a.candidate?'Có bản đang nhập từ '+time(row.updatedAt)+'. Chọn khôi phục hoặc xóa bản tạm.':a.enabled?'Đã bật lưu tạm. Chưa có thay đổi mới.':'Chưa bật lưu tạm');sync();
+      a.revision=row?.revision || 0;a.enabled=row?Boolean(row.enabled):true; // mặc định tự lưu; chỉ tắt khi người dùng đã tắt trên máy này
+      a.candidate=row?.payload || null;
+      status(a.candidate?'Có bản đang nhập từ '+time(row.updatedAt)+'. Chọn khôi phục hoặc xóa bản tạm.':a.enabled?'Tự lưu tạm đang bật. Chưa có thay đổi mới.':'Tự lưu tạm đang tắt');sync();
     } catch(e){a.failed=true;status('Không mở được bộ nhớ máy. Dùng Hồ sơ & tệp → Tải bản nháp.');sync();}
     if(!subscription && window.CPC1Backend.onSessionChange) subscription=window.CPC1Backend.onSessionChange((event,session)=>{
       if(active && (event==='SIGNED_OUT' || (event==='SIGNED_IN' && session?.user?.id!==active.actor))) void end();
@@ -80,21 +81,21 @@
       if(a.ended || a.failed || !allowed())return;
       try {
         const row=await store.write(a.scope,a.system,a.revision,payload,true);a.revision=row.revision;
-        if(a===active&&!a.ended)status(adapter.get().generation!==current.generation?'Đang chờ lưu tạm…':payload?'Đã lưu tạm trên máy · '+time(row.updatedAt)+' · chưa lưu lên hệ thống':'Đã bật lưu tạm. Chưa có thay đổi mới.');
+        if(a===active&&!a.ended)status(adapter.get().generation!==current.generation?'Đang chờ lưu tạm…':payload?'Đã lưu tạm trên máy · '+time(row.updatedAt)+' · chưa lưu lên hệ thống':'Tự lưu tạm đang bật. Chưa có thay đổi mới.');
       } catch(e){a.failed=true;if(a===active)status(e.code==='DRAFT_CONFLICT'?e.message:'Không lưu được trên máy. Dữ liệu còn trên trang; hãy tải bản nháp JSON.');}
     });
     return queue;
   }
-  async function discard() {
+  async function discard(keepEnabled) {
     const a=active;if(!a)return;
-    if(!confirm('Xóa bản tạm của hệ thống này trên máy? Dữ liệu trên trang và hồ sơ đã lưu vẫn giữ nguyên.')){sync();return;}
+    if(!confirm(keepEnabled?'Xóa bản tạm của hệ thống này trên máy? Dữ liệu trên trang và hồ sơ đã lưu vẫn giữ nguyên.':'Tắt tự lưu và xóa bản tạm của hệ thống này trên máy? Dữ liệu trên trang và hồ sơ đã lưu vẫn giữ nguyên.')){sync();return;}
     clearTimeout(timer);await queue.catch(()=>{});
     if(a!==active || a.ended)return;
     try {
       // Re-read only for an explicit discard, never for an automatic conflicting write.
       const row=await store.read(a.scope,a.system);
-      const cleared=await store.write(a.scope,a.system,row?.revision || 0,null,false);
-      a.revision=cleared.revision;a.enabled=false;a.candidate=null;a.failed=false;sync();status('Đã xóa bản tạm trên máy. Tự lưu đã tắt.');
+      const cleared=await store.write(a.scope,a.system,row?.revision || 0,null,keepEnabled);
+      a.revision=cleared.revision;a.enabled=keepEnabled;a.candidate=null;a.failed=false;sync();status(keepEnabled?'Đã xóa bản tạm trên máy. Tự lưu vẫn bật.':'Đã xóa bản tạm trên máy. Tự lưu đã tắt.');
     } catch(e){status('Không xóa được bản tạm: '+e.message);sync();}
   }
   function accepted() {

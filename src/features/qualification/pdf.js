@@ -3,7 +3,8 @@ import fontkit from '@pdf-lib/fontkit';
 
 const FORMS=new Set(['bm01','bm02','bm03','bm04','bm05']);
 const str=v=>v==null?'':String(v);
-const date=v=>/^\d{4}-\d{2}-\d{2}/.test(str(v))?`${str(v).slice(8,10)}/${str(v).slice(5,7)}/${str(v).slice(0,4)}`:str(v);
+// Giờ tự ghi lúc lưu (…T09:42:05+07:00) in kèm giờ phút; ngày nhập tay cũ in như trước.
+const date=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(str(v));return m?`${m[3]}/${m[2]}/${m[1]}${m[4]?` ${m[4]}:${m[5]}`:''}`:str(v);};
 const fe=(e,f)=>e?.forms?.[f]||e?.[f]||{};
 const row=(d,f,l,i)=>Array.isArray(d?.[f]?.[l])?d[f][l][i]||{}:{};
 const erow=(e,f,l,i)=>Array.isArray(fe(e,f)?.rows?.[l])?fe(e,f).rows[l][i]||{}:{};

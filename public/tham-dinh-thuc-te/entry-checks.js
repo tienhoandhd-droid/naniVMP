@@ -60,8 +60,26 @@
   }
   // Nội độc tố (EU/mL): chủ dự án chưa quyết cách ghi gel-clot nên chỉ cảnh báo mềm, không chặn Lưu.
   const soft = (spec = {}) => /EU\/mL/i.test(String(spec.unit || '')) || spec.key === 'endotoxin';
+  // Người thực hiện + thời gian do máy chủ tự ghi lúc lưu (tên tài khoản, giờ lưu đầu) — không nhập tay.
+  // Trả 'name' | 'time' | '' theo đường dẫn dữ liệu (hơi: bm01–bm04 từng lần đo và phần tổng hợp; khí: từng điểm và chứng dương).
+  function autoField(path) {
+    const parts = (path || []).map(String), key = parts.at(-1);
+    const steamRow = /^bm0[1-4]$/.test(parts[0]) && (parts.length === 3 || parts.length === 4) && ['executor', 'date'].includes(key);
+    const gasRow = parts[0] === 'forms' && parts.length === 4 && ['executed_by', 'execution_date', 'result_date'].includes(key);
+    const controls = parts[0] === 'controls' && parts.length === 2 && ['executed_by', 'result_date'].includes(key);
+    const steamMeta = parts[0] === 'meta' && parts.length === 2 && ['executed_by', 'execution_date'].includes(key);
+    if (!steamRow && !gasRow && !controls && !steamMeta) return '';
+    return ['executor', 'executed_by'].includes(key) ? 'name' : 'time';
+  }
+  // Giờ lưu "2026-10-26T09:42:05+07:00" → "26/10/2026 09:42"; ngày cũ nhập tay "2026-09-27" → "27/09/2026".
+  function stampText(value) {
+    const text = String(value ?? '');
+    const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(text);
+    if (!match) return text;
+    return `${match[3]}/${match[2]}/${match[1]}${match[4] ? ` ${match[4]}:${match[5]}` : ''}`;
+  }
   function checkAll(entries, options = {}) {
-    return entries.flatMap(entry => { const message = check(entry.value, entry.spec, options); return message ? [{ path: entry.path, message, spec: entry.spec, soft: soft(entry.spec) }] : []; });
+    return entries.filter(entry => !autoField(entry.path)).flatMap(entry => { const message = check(entry.value, entry.spec, options); return message ? [{ path: entry.path, message, spec: entry.spec, soft: soft(entry.spec) }] : []; });
   }
   const blocking = problems => problems.filter(problem => !problem.soft);
   // Trước khi gửi lưu: cắt khoảng trắng đầu/cuối mọi ô; ô chỉ có khoảng trắng thành ô trống. Trả bản sao.
@@ -155,5 +173,5 @@
     if (!button && stage === 'error') { button = node('button', { id: 'record-save-retry', type: 'button', class: 'button secondary save-retry', text: 'Thử lại' }); state.after(button); }
     if (button) { button.hidden = stage !== 'error'; if (retry) button.onclick = retry; }
   }
-  window.CPC1EntryChecks = Object.freeze({ THOUSAND, SOFT_ENDOTOXIN, soft, blocking, trimAll, thousandAmbiguous, thousandExempt, kind, dateBounds, check, checkAll, sentence, serverProblems, today, show, clearField, watch, saveStatus });
+  window.CPC1EntryChecks = Object.freeze({ autoField, stampText, THOUSAND, SOFT_ENDOTOXIN, soft, blocking, trimAll, thousandAmbiguous, thousandExempt, kind, dateBounds, check, checkAll, sentence, serverProblems, today, show, clearField, watch, saveStatus });
 })();

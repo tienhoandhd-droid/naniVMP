@@ -1,6 +1,6 @@
 import {PDFDocument,rgb} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-const str=v=>v==null?'':String(v), date=(v,fmt)=>/^\d{4}-\d{2}-\d{2}$/.test(str(v))?`${str(v).slice(8,10)}${fmt==='dot'?'.':'/'}${str(v).slice(5,7)}${fmt==='dot'?'.':'/'}${str(v).slice(0,4)}`:str(v);
+const str=v=>v==null?'':String(v), date=(v,fmt)=>{const m=/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):\d{2}\+07:00)?$/.exec(str(v)),sep=fmt==='dot'?'.':'/';return m?`${m[3]}${sep}${m[2]}${sep}${m[1]}${m[4]?` ${m[4]}:${m[5]}`:''}`:str(v);}; // giờ tự ghi lúc lưu in kèm giờ phút
 const formData=(d,f)=>d?.forms?.[f]||{}, row=(d,f,l)=>formData(d,f)?.[l]||{}, ef=(e,f)=>e?.forms?.[f]||{}, erow=(e,f,l)=>ef(e,f)?.rows?.[l]||{};
 async function sha256(bytes){const h=await globalThis.crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function status(e,s){if(s.type==='rowStatus')return str(erow(e,s.form,s.location).status);if(s.type==='formStatus')return str(ef(e,s.form).status);if(s.type==='overall')return str(e?.overall);if(s.type==='controlStatus')return str(e?.controls?.status);return '';}

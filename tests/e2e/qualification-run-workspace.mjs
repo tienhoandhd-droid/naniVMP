@@ -45,7 +45,7 @@ window.CPC1Backend={
  getGasConfig:async system=>{const current=selectedRun(),base=configs[system],due=sessionStorage.getItem('fixture-calibration-due');if(current?.id===runs[0].id&&due)current.calibration['air:bm01:expiry'].due_on=due;return current&&current.items[0].system===system?{...structuredClone(base),_scope:current.items[0].scope,_run:structuredClone(current)}:structuredClone(base)},
  getConfig:async()=>{const current=selectedRun(),base=configs.steam;return current&&current.items[0].system==='steam'?{...structuredClone(base),_scope:current.items[0].scope,_run:structuredClone(current)}:structuredClone(base)},
  listRuns:async()=>structuredClone(runs),listHistory:async()=>[{run_id:runs[1].id,record_id:runs[1].items[0].record_id,version:3,system:'air',period:'2026-09-01',trend:[{form:'bm01',point_id:point,trial:1,metric:'particles',label:'Tiểu phân ≥ 0,5 µm',unit:'hạt/m³',value:12,uncertain:false}]}],historySnapshot:async()=>({evaluation:{}}),
- runRequirements:async scope=>{window.__fixture.requirementsCalls++;return scope.some(item=>item.system==='air'&&item.forms.bm01)?structuredClone(runs[0].calibration_requirements):[]},
+ runRequirements:async scope=>{window.__fixture.requirementsCalls++;const out=scope.some(item=>item.system==='air'&&item.forms.bm01)?structuredClone(runs[0].calibration_requirements):[];if(scope.some(item=>item.system==='nitrogen'&&item.forms.bm01))out.push({...runs[0].calibration_requirements[0],key:'nitrogen:bm01:expiry',system:'nitrogen',payload_path:['equipment','bm01','expiry']});return out;},
  createRun:async definition=>{window.__fixture.created=structuredClone(definition);return {...structuredClone(runs[0]),...definition,id:'00000000-0000-4000-8000-000000000103'}},
  updateRunCalibration:async(id,version,calibration,reason)=>{window.__fixture.updated={id,version,calibration:structuredClone(calibration),reason};return {...structuredClone(runs.find(item=>item.id===id)),version:version+1,calibration}},
  transitionRun:async()=>{},downloadHistorySource:async()=>new Blob(),
@@ -135,16 +135,17 @@ try{
  await form.locator('#message').getByText(/Mạng tạm thời/).waitFor();
  const failedDifferentRequest=await form.evaluate(()=>window.__fixture.saveCalls.at(-1).requestId);
  const executor=form.locator('[name="forms.bm01.'+point+'.executed_by"]');
- await executor.fill('QA cập nhật');
+ assert.equal(await executor.evaluate(input=>input.readOnly),true,'performer is stamped by the server, not typed');
+ await p5.fill('4');
  await form.locator('#record-save').click();
  await form.locator('#correction-reason-dialog[open]').waitFor();
  assert.equal(await form.locator('#correction-reason').inputValue(),'','a changed correction diff cannot reuse the prior reason');
- await form.locator('#correction-reason').fill('Đính chính số đọc và người thực hiện');
+ await form.locator('#correction-reason').fill('Đính chính số đọc lần hai');
  await form.locator('#correction-reason-dialog button[type="submit"]').click();
  await form.locator('#message').getByText(/Đã lưu hồ sơ\./).waitFor();
  const changedDiffSave=await form.evaluate(()=>window.__fixture.saveCalls.at(-1));
  assert.notEqual(changedDiffSave.requestId,failedDifferentRequest,'editing after failure creates a new idempotency key');
- assert.equal(changedDiffSave.reason,'Đính chính số đọc và người thực hiện');
+ assert.equal(changedDiffSave.reason,'Đính chính số đọc lần hai');
  await form.reload();
  await form.locator('#entry-mode-warning').waitFor();
  assert.equal(await form.locator('[name="forms.bm01.'+point+'.p05"]').inputValue(),'','reload keeps the accepted cleared reading');
@@ -213,6 +214,15 @@ try{
  await runsPage.locator('#create-submit').click();
  await runsPage.waitForFunction(()=>window.__fixture.created?.calibration);
  assert.deepEqual(await runsPage.evaluate(()=>window.__fixture.created.calibration),{'air:bm01:expiry':{name:'Máy đếm 02',due_on:'2026-12-30'}});
+ await runsPage.locator('input[name="mode"][value="campaign"]').check();
+ await runsPage.locator('#calibration-fields fieldset').getByText(/Khí nén và nitơ dùng chung/).waitFor();
+ assert.equal(await runsPage.locator('#calibration-fields fieldset').count(),1,'air and nitrogen share one device entry');
+ await runsPage.locator('#run-title').fill('Đợt khí tháng 10');
+ await runsPage.locator('#calibration-fields input[type="text"]').fill('Máy đếm 03');
+ await runsPage.locator('#calibration-fields input[type="date"]').fill('2026-12-31');
+ await runsPage.locator('#create-submit').click();
+ await runsPage.waitForFunction(()=>window.__fixture.created?.title==='Đợt khí tháng 10');
+ assert.deepEqual(await runsPage.evaluate(()=>window.__fixture.created.calibration),{'air:bm01:expiry':{name:'Máy đếm 03',due_on:'2026-12-31'},'nitrogen:bm01:expiry':{name:'Máy đếm 03',due_on:'2026-12-31'}},'one entry is saved for both gas systems');
  assert.equal(await runsPage.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,'mobile page does not overflow');
 
  const trend=await localPage();

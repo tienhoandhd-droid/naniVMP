@@ -21,7 +21,7 @@
   function pasteContext() {
     const run=state.config?._run,item=run?.items?.find(x=>x.system==='steam'),userId=state.session?.user?.id;
     const specs=state.active==='bm02'?bm02Fields:trialFields[state.active]?[...trialFields[state.active].map(([key,label,unit])=>[key,label,unit,'number']),['executor','Người thực hiện','','text'],['date','Ngày đo','','date']]:[];
-    const columns=specs.map(([key,label,unit,type])=>{const spec=configField(state.active,key,{label,unit,type});return {key,label:spec.label+((spec.unit||unit)?' ('+(spec.unit||unit)+')':''),type:state.active==='bm02'&&key==='microbial'?'text':spec.type||type,unit:spec.unit||unit};}).filter(c=>['number','text','date'].includes(c.type));
+    const columns=specs.map(([key,label,unit,type])=>{const spec=configField(state.active,key,{label,unit,type});return {key,label:spec.label+((spec.unit||unit)?' ('+(spec.unit||unit)+')':''),type:state.active==='bm02'&&key==='microbial'?'text':spec.type||type,unit:spec.unit||unit};}).filter(c=>['number','text','date'].includes(c.type)&&!['executor','date'].includes(c.key));
     const scope=item?.scope?.[state.active]||[],targets=[];
     for(const p of locations().filter(p=>scope.includes(p.id)))for(let trial=1;trial<=(state.active==='bm02'?1:3);trial++){
       const paths={},values={},editable={},reasons={};
@@ -61,6 +61,9 @@
     const input = type === 'textarea' ? el('textarea', { id, name: key, maxlength: '500' }) : type === 'select' ? el('select', { id, name: key }) : el('input', { id, name: key, type: type === 'number' ? 'text' : type, maxlength: type === 'text' ? '160' : '40', inputmode: type === 'number' && !notDetected ? 'decimal' : undefined });
     if (type === 'select') (options || []).forEach(option => input.append(el('option', { value: option.value, text: option.label })));
     const dataPath=key.split('.').map((part,index)=>index===1&&['bm01','bm02','bm03','bm04'].includes(key.split('.')[0])?part.replaceAll('__dot__','.'):/^\d+$/.test(part)?Number(part):part);
+    // Người thực hiện + thời gian: máy chủ tự ghi lúc lưu (tên tài khoản, giờ lưu đầu) — chỉ hiển thị.
+    const auto = Checks.autoField(dataPath);
+    if (auto) { input.type = 'text'; input.readOnly = true; input.classList.add('readonly'); input.placeholder = 'Tự ghi khi lưu'; input.value = auto === 'time' ? Checks.stampText(value) : safeText(value, 160); wrapper.append(input); return wrapper; }
     const locked=Boolean(state.config?._run)&&(!entryHistory.canEdit({system:'steam',form:state.active,point:locationId(),data:state.data,path:dataPath})||entryHistory.isCalibrationPath(state.config,dataPath));
     input.setAttribute('aria-describedby', `${id}-error`); input.value = safeText(value, type === 'textarea' ? 500 : 160); if (readOnly||locked) { input.readOnly = true; input.classList.add('readonly'); }
     if (!readOnly&&!locked) { Checks.watch(input, { type, unit, key: dataPath.at(-1), label, notDetected }); input.addEventListener('input', () => { writePath(key, input.value); state.problems = state.problems.filter(problem => locate(problem.path) !== input); markDirty(); }); }

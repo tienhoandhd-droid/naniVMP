@@ -58,8 +58,27 @@ test('ngày đo phải đúng lịch, từ 2020-01-01 đến hôm nay + 1; ngày
 test('ô trống luôn hợp lệ; kiểm cả bộ trả từng đường dẫn ô sai theo thứ tự',()=>{
  const c=checks();
  assert.equal(c.check('',volume,{today}),'');assert.equal(c.check('   ',volume,{today}),'');
- const problems=c.checkAll([{path:['forms','bm01','A','p05'],value:'4.000',spec:particles},{path:['forms','bm01','A','p5'],value:'',spec:particles},{path:['forms','bm01','A','execution_date'],value:'2030-01-01',spec:measured}],{today});
- assert.deepEqual(plain(problems.map(p=>p.path)),[['forms','bm01','A','p05'],['forms','bm01','A','execution_date']]);
+ const problems=c.checkAll([{path:['forms','bm01','A','p05'],value:'4.000',spec:particles},{path:['forms','bm01','A','p5'],value:'',spec:particles},{path:['forms','bm04','A','sampling_date'],value:'2030-01-01',spec:measured}],{today});
+ assert.deepEqual(plain(problems.map(p=>p.path)),[['forms','bm01','A','p05'],['forms','bm04','A','sampling_date']]);
+});
+
+test('người thực hiện + thời gian do máy chủ tự ghi: nhận đúng ô, không kiểm như ô nhập tay, hiển thị ngày giờ',()=>{
+ const c=checks();
+ assert.equal(c.autoField(['forms','bm01','A','executed_by']),'name');
+ assert.equal(c.autoField(['forms','bm01','A','execution_date']),'time');
+ assert.equal(c.autoField(['forms','bm04','A','result_date']),'time');
+ assert.equal(c.autoField(['forms','bm04','A','sampling_date']),'','ngày lấy mẫu vẫn nhập tay');
+ assert.equal(c.autoField(['forms','bm04','A','sampled_by']),'','người lấy mẫu vẫn nhập tay');
+ assert.equal(c.autoField(['controls','executed_by']),'name');
+ assert.equal(c.autoField(['bm01','S1',0,'executor']),'name');
+ assert.equal(c.autoField(['bm02','S1','date']),'time');
+ assert.equal(c.autoField(['meta','execution_date']),'time');
+ assert.equal(c.autoField(['meta','report_date']),'','ngày báo cáo vẫn nhập tay');
+ assert.equal(c.autoField(['equipment','balance_due']),'');
+ assert.equal(c.stampText('2026-10-26T09:42:05+07:00'),'26/10/2026 09:42');
+ assert.equal(c.stampText('2026-09-27'),'27/09/2026','hồ sơ cũ chỉ có ngày');
+ assert.equal(c.stampText(''),'');
+ assert.deepEqual(plain(c.checkAll([{path:['forms','bm01','A','execution_date'],value:'2026-10-26T09:42:05+07:00',spec:measured}],{today})),[]);
 });
 
 test('lỗi chặn từ máy chủ: giữ thông báo và đọc mọi dạng danh sách đường dẫn ô',()=>{

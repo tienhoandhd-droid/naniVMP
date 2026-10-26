@@ -43,7 +43,8 @@
     const visit=value=>{
       if(!value||typeof value!=='object')return;
       for(const [key,item] of Object.entries(value)){
-        if(['date','execution_date','result_date','measured_on'].includes(key)&&typeof item==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(item))found.push(item);
+        // Giờ tự ghi lúc lưu (YYYY-MM-DDTHH:MM:SS+07:00): lấy phần ngày để so hạn hiệu chuẩn như ngày nhập tay cũ.
+        if(['date','execution_date','result_date','measured_on'].includes(key)&&typeof item==='string'&&/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}\+07:00)?$/.test(item))found.push(item.slice(0,10));
         else if(item&&typeof item==='object')visit(item);
       }
     };
@@ -68,7 +69,9 @@
       target[path.at(-1)]=value;return [{path:[...path],before:empty(before)?'':String(before),after:value}];
     });
   };
-  const historyRows=events=>(events||[]).flatMap(event=>{const dateChange=(event.changes||[]).find(change=>['date','execution_date','result_date','measured_on'].includes(change.path?.at(-1))),measured_on=Array.isArray(event.measurement_dates)&&event.measurement_dates.length?event.measurement_dates.join(', '):dateChange?(dateChange.after||dateChange.before||'Không ghi nhận'):'Không ghi nhận';return (event.changes||[]).map(change=>({
+  // Giờ tự ghi hiện dạng dd/mm/yyyy HH:mm; ngày nhập tay cũ giữ nguyên cách hiển thị.
+  const stampShown=value=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:/.test(value)&&window.CPC1EntryChecks?window.CPC1EntryChecks.stampText(value):value;
+  const historyRows=events=>(events||[]).flatMap(event=>{const dateChange=(event.changes||[]).find(change=>['date','execution_date','result_date','measured_on'].includes(change.path?.at(-1))),measured_on=Array.isArray(event.measurement_dates)&&event.measurement_dates.length?event.measurement_dates.map(stampShown).join(', '):dateChange?stampShown(dateChange.after||dateChange.before||'Không ghi nhận'):'Không ghi nhận';return (event.changes||[]).map(change=>({
     version:event.version,saved_at:String(event.created_at||''),actor:String(event.actor_name||'Không xác định'),
     reason:String(event.reason||'Không ghi nhận'),measured_on:String(measured_on),path:(change.path||[]).join('.'),
     before:empty(change.before)?'':String(change.before),after:empty(change.after)?'':String(change.after)

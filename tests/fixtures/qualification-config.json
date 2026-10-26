@@ -19,6 +19,7 @@
       "config": {
         "title": "Khí nén thử nghiệm",
         "formula_version": "synthetic-1",
+        "controls_fields": [{"key": "positive_count", "type": "number", "unit": "CFU", "label": "Số CFU thu hồi — chứng dương"}, {"key": "executed_by", "type": "text", "unit": "", "label": "Người đọc chứng dương"}, {"key": "result_date", "type": "date", "unit": "", "label": "Ngày trả kết quả chứng dương"}],
         "forms": [
           {
             "id": "bm01",
@@ -42,6 +43,7 @@
       "config": {
         "title": "Khí nitơ thử nghiệm",
         "formula_version": "synthetic-1",
+        "controls_fields": [{"key": "positive_count", "type": "number", "unit": "CFU", "label": "Số CFU thu hồi — chứng dương"}, {"key": "executed_by", "type": "text", "unit": "", "label": "Người đọc chứng dương"}, {"key": "result_date", "type": "date", "unit": "", "label": "Ngày trả kết quả chứng dương"}],
         "forms": [
           {
             "id": "bm01",
