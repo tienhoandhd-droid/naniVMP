@@ -38,19 +38,22 @@ function todayVn(): string {
 
 /* Chữ riêng cho từng nguồn: tab Thay đổi (sheet Tổng hợp thay đổi) và tab Sai lệch (sổ sai lệch). */
 const KIND_TEXT: Record<ChangeRecordKind, {
-  heading: string; caption: string; code: string; noun: string; empty: string; search: string;
+  heading: string; caption: string; code: string; noun: string; empty: string; noMatch: string;
+  search: string; deadlineColumn: string;
   content: string; classLabel: string; deptLabel: string; deadline: string;
 }> = {
   thay_doi: {
     heading: "Thẩm định do thay đổi", caption: "Phiếu thay đổi cần thẩm định", code: "Mã thay đổi", noun: "phiếu thay đổi",
-    empty: "Chưa có phiếu thay đổi cần thẩm định", search: "Mã CC, nội dung, mã thiết bị",
+    empty: "Chưa có phiếu thay đổi cần thẩm định", noMatch: "Không có phiếu nào khớp bộ lọc.",
+    search: "Mã CC, nội dung, mã thiết bị", deadlineColumn: "Hạn",
     content: "Nội dung thay đổi", classLabel: "Loại", deptLabel: "Phòng ban · phụ trách",
     deadline: "Hạn thẩm định (theo sheet)",
   },
   sai_lech: {
     heading: "Thẩm định do sai lệch", caption: "Sai lệch cần thẩm định", code: "Mã sai lệch", noun: "sai lệch",
     // Chủ dự án chốt 29/10: không có dòng cần thẩm định thì ghi "Không có".
-    empty: "Không có", search: "Mã DEV, nội dung, mã thiết bị",
+    empty: "Không có", noMatch: "Không có",
+    search: "Mã DEV, nội dung, mã thiết bị", deadlineColumn: "Hạn CAPA",
     content: "Nội dung sai lệch", classLabel: "Sản phẩm · mức độ", deptLabel: "Bộ phận liên quan",
     deadline: "Hạn CAPA (theo sheet)",
   },
@@ -153,7 +156,7 @@ export default function ChangeValidationPanel({ kind }: { kind: ChangeRecordKind
     },
     {
       id: "deadline",
-      header: "Hạn",
+      header: label.deadlineColumn,
       cell: (row) => (
         <div className="rv-code">
           <b className={isOverdue(row, today) ? "tdd-qua-han" : undefined}>
@@ -237,6 +240,10 @@ export default function ChangeValidationPanel({ kind }: { kind: ChangeRecordKind
       {canEdit && sync?.lastStatus === "loi" && sync.lastError && (
         <p className="cw-loi" role="alert">Lần cập nhật gần nhất bị lỗi: {sync.lastError}</p>
       )}
+      {/* Lượt đạt nhưng có cảnh báo: sổ sai lệch không đọc được thì phiếu thay đổi vẫn cập nhật. */}
+      {canEdit && sync?.lastStatus === "xong" && sync.lastError && (
+        <p className="cw-loi" role="alert">Lần cập nhật gần nhất có cảnh báo: {sync.lastError}</p>
+      )}
       {refreshError && (
         <p className="cw-loi" role="alert">Chưa tải lại được: {refreshError}{" "}
           <button type="button" className="cw-nut" onClick={() => setTick((value) => value + 1)}>Thử lại</button>
@@ -254,7 +261,7 @@ export default function ChangeValidationPanel({ kind }: { kind: ChangeRecordKind
       )}
       {loadState === "ready" && data && kindRecords.length > 0 && (
         <SmartTable caption={label.caption} rows={rows} rowKey={(row) => row.id}
-          columns={columns} empty="Không có phiếu nào khớp bộ lọc." />
+          columns={columns} empty={label.noMatch} />
       )}
 
       {openRecord && (

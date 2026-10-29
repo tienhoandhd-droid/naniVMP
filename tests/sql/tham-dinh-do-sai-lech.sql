@@ -129,21 +129,71 @@ select pg_temp.ghi('4', 'bỏ chữ Có: phiếu còn, có mốc bỏ yêu cầu
   (select r::text from k3));
 
 -- ---------------------------------------------------------------------
--- Mục 5: sổ sai lệch thiếu cột → dừng lượt, không đoán
+-- Mục 5: sổ sai lệch hỏng/không đọc được → chỉ cảnh báo, không chặn tab thay đổi
 -- ---------------------------------------------------------------------
+-- Tab thay đổi thử (tên riêng, không đụng phiếu thật).
+create function pg_temp.tab_cc(p_ma text) returns jsonb language sql as $$
+  select jsonb_build_object('range', '''CC thử''!A1:AA2000', 'values', jsonb_build_array(
+    jsonb_build_array('Mã thay đổi', 'Nội dung thay đổi', 'Có cần tiến hành thẩm định không?',
+                      'Nội dung thẩm định', 'Deadline thẩm định', 'Mã sai lệch'),
+    jsonb_build_array(p_ma, 'Bổ sung tank', 'x', 'Thẩm định tank', '30/11/2026', 'DEV-1')))
+$$;
 create temp table l4 on commit drop as select pg_temp.luot() as id;
 create temp table k4 on commit drop as
 select public.vmp_change_sync_ingest((select id from l4), jsonb_build_object('valueRanges', jsonb_build_array(
+  pg_temp.tab_cc('CC-THU-001'),
   jsonb_build_object('range', '''Sổ quản lý sai lệch (2026)''!A2:AE3000',
     'values', jsonb_build_array(jsonb_build_array('STT', 'Mã sai lệch', 'Nội dung sai lệch'),
                                 jsonb_build_array('1', 'DEV-2606-001', 'abc')))))) r;
-select pg_temp.ghi('5', 'thiếu cột VQ: lượt lỗi, nêu đúng tên cột',
-  (select (r->>'ok')::boolean = false and r->>'error' like '%Có cần thông báo team VQ%' from k4)
-  and (select status from public.vmp_change_sync_runs where id = (select id from l4)) = 'loi',
+select pg_temp.ghi('5', 'sổ sai lệch thiếu cột VQ: lượt vẫn đạt, có cảnh báo đúng tên cột',
+  (select (r->>'ok')::boolean and (r->>'created')::int = 1
+          and r->>'canh_bao' like '%Có cần thông báo team VQ%' from k4)
+  and (select status = 'xong' and error like '%Có cần thông báo team VQ%'
+         from public.vmp_change_sync_runs where id = (select id from l4)),
   (select r::text from k4));
-select pg_temp.ghi('5', 'lượt lỗi không đổi phiếu',
+select pg_temp.ghi('5', 'tab thay đổi có cột "Mã sai lệch" vẫn là phiếu thay đổi',
+  (select record_kind from public.vmp_change_records where change_code = 'CC-THU-001') = 'thay_doi');
+select pg_temp.ghi('5', 'phiếu sai lệch giữ nguyên khi sổ hỏng (không bị đánh dấu bỏ)',
   exists (select 1 from public.vmp_change_records where change_code = 'DEV-2606-001'
            and removed_from_sheet_at is null));
+
+create temp table l5 on commit drop as select pg_temp.luot() as id;
+create temp table k5 on commit drop as
+select public.vmp_change_sync_ingest((select id from l5), jsonb_build_object(
+  'valueRanges', jsonb_build_array(pg_temp.tab_cc('CC-THU-001')),
+  'loi_doc_sai_lech', 'The credential needs to be reconnected')) r;
+select pg_temp.ghi('5', 'n8n không đọc được sổ sai lệch: phiếu thay đổi vẫn cập nhật, có cảnh báo',
+  (select (r->>'ok')::boolean and (r->>'unchanged')::int = 1
+          and r->>'canh_bao' like '%Không đọc được sổ sai lệch%' from k5)
+  and exists (select 1 from public.vmp_change_records where change_code = 'DEV-2606-001'
+               and removed_from_sheet_at is null),
+  (select r::text from k5));
+
+create temp table l6 on commit drop as select pg_temp.luot() as id;
+create temp table k6 on commit drop as
+select public.vmp_change_sync_ingest((select id from l6),
+  jsonb_build_object('valueRanges', jsonb_build_array(pg_temp.tab_cc('CC-THU-001')))) r;
+select pg_temp.ghi('5', 'lượt không cảnh báo thì error trống',
+  (select status = 'xong' and error is null from public.vmp_change_sync_runs where id = (select id from l6)));
+
+-- Sheet thay đổi hỏng vẫn chặn cả lượt như cũ.
+create temp table l7 on commit drop as select pg_temp.luot() as id;
+create temp table k7 on commit drop as
+select public.vmp_change_sync_ingest((select id from l7), jsonb_build_object('valueRanges', jsonb_build_array(
+  jsonb_build_object('range', '''CC thử''!A1:AA2000', 'values',
+    jsonb_build_array(jsonb_build_array('Mã thay đổi', 'Nội dung thay đổi')))))) r;
+select pg_temp.ghi('5', 'sheet thay đổi thiếu cột: vẫn dừng lượt (lỗi)',
+  (select (r->>'ok')::boolean = false from k7)
+  and (select status from public.vmp_change_sync_runs where id = (select id from l7)) = 'loi',
+  (select r::text from k7));
+
+-- ---------------------------------------------------------------------
+-- Mục 5b: trợ lý VMP không tính sai lệch vào "phiếu thay đổi"
+-- ---------------------------------------------------------------------
+select pg_temp.ghi('5b', 'vmp_tl_thay_doi chỉ đọc record_kind = thay_doi',
+  pg_get_functiondef('public.vmp_tl_thay_doi(uuid,jsonb)'::regprocedure) like '%c.record_kind = ''thay_doi''%');
+select pg_temp.ghi('5b', 'vmp_tl_thiet_bi chỉ đọc record_kind = thay_doi',
+  pg_get_functiondef('public.vmp_tl_thiet_bi(uuid,jsonb)'::regprocedure) like '%c.record_kind = ''thay_doi''%');
 
 -- ---------------------------------------------------------------------
 -- Mục 6: quyền hàm giữ nguyên
@@ -152,6 +202,11 @@ select pg_temp.ghi('6', 'authenticated/anon không gọi được ingest',
   not has_function_privilege('authenticated', 'public.vmp_change_sync_ingest(uuid,jsonb)', 'execute')
   and not has_function_privilege('anon', 'public.vmp_change_sync_ingest(uuid,jsonb)', 'execute')
   and has_function_privilege('service_role', 'public.vmp_change_sync_ingest(uuid,jsonb)', 'execute'));
+select pg_temp.ghi('6', 'quyền 2 hàm trợ lý giữ nguyên (authenticated không gọi trực tiếp)',
+  not has_function_privilege('anon', 'public.vmp_tl_thay_doi(uuid,jsonb)', 'execute')
+  and not has_function_privilege('authenticated', 'public.vmp_tl_thay_doi(uuid,jsonb)', 'execute')
+  and not has_function_privilege('anon', 'public.vmp_tl_thiet_bi(uuid,jsonb)', 'execute')
+  and not has_function_privilege('authenticated', 'public.vmp_tl_thiet_bi(uuid,jsonb)', 'execute'));
 select pg_temp.ghi('6', 'authenticated/anon không gọi được record_json',
   not has_function_privilege('authenticated', 'public.vmp_change_record_json(uuid,uuid,boolean)', 'execute')
   and not has_function_privilege('anon', 'public.vmp_change_record_json(uuid,uuid,boolean)', 'execute'));

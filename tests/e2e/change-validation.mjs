@@ -251,7 +251,7 @@ try {
   }));
   assert.deepEqual(saiLech, {
     heading: "Thẩm định do sai lệch",
-    headers: ["Mã sai lệch", "Cần thẩm định", "Thiết bị", "Hạn", "Trạng thái", ""],
+    headers: ["Mã sai lệch", "Cần thẩm định", "Thiết bị", "Hạn CAPA", "Trạng thái", ""],
     coCC: false,
   });
   await page.click('button[aria-label="Sửa DEV-2606-001"]');

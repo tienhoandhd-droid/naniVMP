@@ -48,6 +48,8 @@ declare
   v_mark text;
   v_kind text;
   v_start int;
+  v_err_before int;
+  v_warnings text[] := '{}';
   v_rec record;
   v_created int := 0;
   v_updated int := 0;
@@ -84,6 +86,12 @@ begin
   ) on commit drop;
   truncate pg_temp.cc_rows;
 
+  -- n8n không đọc được sổ sai lệch: vẫn cập nhật phiếu thay đổi, ghi cảnh báo.
+  if nullif(btrim(p_payload ->> 'loi_doc_sai_lech'), '') is not null then
+    v_warnings := array_append(v_warnings,
+      'Không đọc được sổ sai lệch: ' || left(p_payload ->> 'loi_doc_sai_lech', 300));
+  end if;
+
   if jsonb_typeof(p_payload -> 'valueRanges') is distinct from 'array'
      or jsonb_array_length(p_payload -> 'valueRanges') = 0 then
     v_errors := array_append(v_errors, 'Dữ liệu từ sheet sai dạng (không có valueRanges).');
@@ -100,31 +108,40 @@ begin
         continue;
       end if;
       v_tabs := v_tabs || v_tab;
+      -- Tab sổ sai lệch: tên tab có "sai lệch", hoặc tiêu đề có "Mã sai lệch" mà không có
+      -- "Mã thay đổi". Lỗi của tab này chỉ là cảnh báo: phiếu sai lệch giữ nguyên, phiếu
+      -- thay đổi vẫn cập nhật (sheet của nhóm khác hỏng không chặn nguồn kia).
+      v_kind := case when public.vmp_change_header_key(v_tab) like '%sai lệch%'
+                       or (jsonb_typeof(v_values -> 0) = 'array'
+                           and exists (select 1 from jsonb_array_elements_text(v_values -> 0) h
+                                        where public.vmp_change_header_key(h) = 'mã sai lệch')
+                           and not exists (select 1 from jsonb_array_elements_text(v_values -> 0) h
+                                            where public.vmp_change_header_key(h) = 'mã thay đổi'))
+                     then 'sai_lech' else 'thay_doi' end;
+      v_err_before := cardinality(v_errors);
+      <<mot_tab>>
+      begin
       if jsonb_typeof(v_values) is distinct from 'array' or jsonb_array_length(v_values) = 0 then
         v_errors := array_append(v_errors, format('Tab "%s" trống.', v_tab));
-        continue;
+        exit mot_tab;
       end if;
       if jsonb_array_length(v_values) > 5001 then
         v_errors := array_append(v_errors, format('Tab "%s" có quá 5000 dòng.', v_tab));
-        continue;
+        exit mot_tab;
       end if;
 
       -- Ghép tiêu đề → vị trí cột (theo TÊN, không theo chữ cái cột).
       v_header := v_values -> 0;
       if jsonb_typeof(v_header) is distinct from 'array' then
         v_errors := array_append(v_errors, format('Tab "%s": dòng tiêu đề sai dạng.', v_tab));
-        continue;
+        exit mot_tab;
       end if;
       if exists (select 1 from jsonb_array_elements(v_values) r where jsonb_typeof(r) is distinct from 'array') then
         v_errors := array_append(v_errors, format('Tab "%s": có dòng sai dạng.', v_tab));
-        continue;
+        exit mot_tab;
       end if;
       v_idx := '{}'::jsonb;
       v_dup_cols := '{}';
-      -- Tab sổ sai lệch nhận ra bằng cột "Mã sai lệch"; còn lại là tab thay đổi.
-      v_kind := case when exists (select 1 from jsonb_array_elements_text(v_header) h
-                                   where public.vmp_change_header_key(h) = 'mã sai lệch')
-                     then 'sai_lech' else 'thay_doi' end;
       for v_i in 0 .. coalesce(jsonb_array_length(v_header), 0) - 1 loop
         v_k := public.vmp_change_header_key(v_header ->> v_i);
         v_k := case
@@ -166,7 +183,7 @@ begin
       if cardinality(v_dup_cols) > 0 then
         v_errors := array_append(v_errors, format('Tab "%s" có cột trùng tên: %s.', v_tab,
           array_to_string(v_dup_cols, ', ')));
-        continue;
+        exit mot_tab;
       end if;
       select array_agg(x) into v_missing
         from unnest(case when v_kind = 'sai_lech' then array['code', 'mark', 'content']
@@ -178,7 +195,7 @@ begin
                               when 'mark' then 'Có cần thông báo team VQ thẩm định thiết bị/nhà xưởng hay không?'
                               else 'Nội dung sai lệch' end
                 from unnest(v_missing) x), ', ')));
-        continue;
+        exit mot_tab;
       end if;
       if v_missing is not null then
         v_errors := array_append(v_errors, format('Tab "%s" thiếu cột: %s.', v_tab, array_to_string(
@@ -188,7 +205,7 @@ begin
                               when 'deadline' then 'Deadline thẩm định'
                               else 'Nội dung thay đổi' end
                 from unnest(v_missing) x), ', ')));
-        continue;
+        exit mot_tab;
       end if;
 
       for v_rowno in 1 .. jsonb_array_length(v_values) - 1 loop
@@ -237,7 +254,15 @@ begin
                       where n > 1 and nullif(btrim(r ->> (v_idx ->> 'code')::int), '') is not null)
          and exists (select 1 from public.vmp_change_records c
                       where c.source_tab = v_tab and c.removed_from_sheet_at is null) then
-        v_errors := array_append(v_errors, format('Tab "%s" không còn dòng nào có mã thay đổi.', v_tab));
+        v_errors := array_append(v_errors, format('Tab "%s" không còn dòng nào có %s.', v_tab,
+          case v_kind when 'sai_lech' then 'mã sai lệch' else 'mã thay đổi' end));
+      end if;
+      end mot_tab;
+      if v_kind = 'sai_lech' and cardinality(v_errors) > v_err_before then
+        v_warnings := v_warnings || v_errors[v_err_before + 1:];
+        v_errors := v_errors[1:v_err_before];
+        v_tabs := array_remove(v_tabs, v_tab);
+        delete from pg_temp.cc_rows where source_tab = v_tab;
       end if;
     end loop;
   end if;
@@ -260,8 +285,16 @@ begin
        and not exists (select 1 from pg_temp.cc_rows r
                         where r.source_tab = c.source_tab and r.change_code = c.change_code);
     if v_drop >= 5 and v_drop * 2 > v_active and not v_force then
-      v_errors := array_append(v_errors, format(
-        'Tab "%s": %s/%s phiếu bỗng mất dấu cần thẩm định — dừng để kiểm tra sheet.', v_tab, v_drop, v_active));
+      if exists (select 1 from public.vmp_change_records c
+                  where c.source_tab = v_tab and c.record_kind = 'sai_lech') then
+        v_warnings := array_append(v_warnings, format(
+          'Tab "%s": %s/%s phiếu bỗng mất dấu cần thẩm định — giữ nguyên, cần kiểm tra sheet.', v_tab, v_drop, v_active));
+        v_tabs := array_remove(v_tabs, v_tab);
+        delete from pg_temp.cc_rows where source_tab = v_tab;
+      else
+        v_errors := array_append(v_errors, format(
+          'Tab "%s": %s/%s phiếu bỗng mất dấu cần thẩm định — dừng để kiểm tra sheet.', v_tab, v_drop, v_active));
+      end if;
     end if;
   end loop;
   if cardinality(v_errors) > 0 then
@@ -383,9 +416,11 @@ begin
     'cho_phep_bo_hang_loat', v_force,
     'tabs', to_jsonb(v_tabs), 'rows_with_code', v_seen, 'created', v_created,
     'updated', v_updated, 'unchanged', v_unchanged, 'flagged_removed', v_removed,
-    'duplicates', v_dup, 'marked_without_code', v_no_code);
+    'duplicates', v_dup, 'marked_without_code', v_no_code, 'canh_bao', to_jsonb(v_warnings));
+  -- Lượt đạt nhưng có cảnh báo (sổ sai lệch): ghi vào error để web báo cho QA.
   update public.vmp_change_sync_runs
-     set status = 'xong', finished_at = now(), summary = v_summary, error = null
+     set status = 'xong', finished_at = now(), summary = v_summary,
+         error = nullif(left(array_to_string(v_warnings, ' '), 1000), '')
    where id = p_run_id;
   return jsonb_build_object('ok', true) || v_summary;
 end
@@ -438,3 +473,154 @@ as $$
   from public.vmp_change_records c
   where c.id = p_id
 $$;
+
+-- ---------------------------------------------------------------------
+-- Trợ lý VMP: câu hỏi "phiếu thay đổi" chỉ đếm phiếu từ sheet thay đổi.
+-- Thân hàm lấy nguyên từ production 29/10, chỉ thêm điều kiện record_kind.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.vmp_tl_thay_doi(p_uid uuid, p jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_tk text := nullif(btrim(p->>'tu_khoa'), '');
+  -- Tra theo mã phiếu/thiết bị mà không nói trạng thái → tìm cả phiếu đã đóng.
+  v_loc text := coalesce(p->>'loc', case when v_tk is not null then 'tat_ca' else 'mo' end);
+  v_tong integer;
+  v_dong jsonb;
+  v_nhan text := case v_loc when 'mo' then 'đang mở' when 'qua_han' then 'quá hạn'
+                            when 'chua_gan' then 'chưa gắn thiết bị' else 'tất cả' end;
+begin
+  with chon as (
+    select c.*, coalesce(c.deadline_override, c.deadline_sheet) han,
+           (select string_agg(co.object_code, ', ' order by co.object_code)
+              from public.vmp_change_objects co where co.change_id = c.id) thiet_bi
+      from public.vmp_change_records c
+     where c.needs_validation
+       and c.record_kind = 'thay_doi'
+       and public.vmp_change_can_view(p_uid, c.id)
+  ), loc as (
+    select * from chon c
+     where case v_loc
+             when 'tat_ca' then true
+             when 'qua_han' then c.removed_from_sheet_at is null and c.handling_status in ('cho_xu_ly', 'dang_tham_dinh')
+                                 and c.han < public.vmp_tl_hom_nay()
+             when 'chua_gan' then c.removed_from_sheet_at is null and c.handling_status in ('cho_xu_ly', 'dang_tham_dinh')
+                                  and c.thiet_bi is null
+             else c.removed_from_sheet_at is null and c.handling_status in ('cho_xu_ly', 'dang_tham_dinh') end
+       and (v_tk is null or public.vmp_tl_khop_tu(concat_ws(' ', c.change_code, c.validation_content, c.thiet_bi), v_tk))
+  )
+  select count(*),
+         coalesce(jsonb_agg(jsonb_build_object(
+           'ma', l.change_code,
+           'noi_dung', left(coalesce(l.validation_content, l.change_content, ''), 140),
+           'han', coalesce(public.vmp_tl_ngay(l.han), '—'),
+           'trang_thai', case when l.removed_from_sheet_at is not null then 'Đã bỏ khỏi sheet'
+                              else case l.handling_status when 'cho_xu_ly' then 'Chờ xử lý'
+                                     when 'dang_tham_dinh' then 'Đang thẩm định' when 'da_xong' then 'Đã xong'
+                                     else 'Không áp dụng' end end,
+           'thiet_bi', coalesce(l.thiet_bi, 'chưa gắn'))
+           order by l.han nulls last, l.change_code) filter (where l.rn <= 50), '[]'::jsonb)
+    into v_tong, v_dong
+    from (select loc.*, row_number() over (order by loc.han nulls last, loc.change_code) rn from loc) l;
+
+  return jsonb_build_object(
+    'ok', true,
+    'hieu_la', 'Phiếu thay đổi cần thẩm định · ' || v_nhan || case when v_tk is not null then ' · "' || v_tk || '"' else '' end,
+    'tra_loi', case when v_tong = 0 then format('Không có phiếu thay đổi cần thẩm định nào %s.', v_nhan)
+      else format('Có %s phiếu thay đổi cần thẩm định %s. Hạn lấy theo sheet thay đổi.', v_tong, v_nhan) end,
+    'bang', case when v_tong > 0 then jsonb_build_object(
+      'cot', '[{"key":"ma","nhan":"Mã thay đổi"},{"key":"noi_dung","nhan":"Nội dung thẩm định"},
+               {"key":"han","nhan":"Hạn"},{"key":"trang_thai","nhan":"Trạng thái"},
+               {"key":"thiet_bi","nhan":"Thiết bị"}]'::jsonb,
+      'dong', v_dong, 'tong_dong', v_tong) end,
+    'goi_y', jsonb_build_array(
+      public.vmp_tl_goi_y('Phiếu quá hạn', 'thay_doi', '{"loc":"qua_han"}'),
+      public.vmp_tl_goi_y('Phiếu chưa gắn thiết bị', 'thay_doi', '{"loc":"chua_gan"}')));
+end
+$function$;
+
+CREATE OR REPLACE FUNCTION public.vmp_tl_thiet_bi(p_uid uuid, p jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_tk text := btrim(p->>'tu_khoa');
+  v_so integer;
+  v_ma text;
+  v_ten text;
+  v_hoi jsonb;
+  v_dong jsonb;
+  v_tong integer;
+  v_cc jsonb;
+begin
+  -- Đối tượng xem được và khớp mọi từ khoá (mã, tên, khu, line). Trùng mã thì chọn luôn.
+  with khop as (
+    select s.object_code code, o.name, s.area_code area,
+           public.vmp_tl_chuan(s.object_code) = public.vmp_tl_chuan(v_tk) chinh_xac
+      from public.vmp_source_objects s
+      left join public.vmp_objects o on o.code = s.object_code and o.is_active
+     where s.is_active
+       and public.vmp_tl_khop_tu(concat_ws(' ', s.object_code, o.name, s.area_code, s.line), v_tk)
+       and s.id in (select visible.id from public.vmp_visible_source_ids(p_uid) visible)
+  ), chon as (
+    select * from khop k
+     where k.chinh_xac or not exists (select 1 from khop x where x.chinh_xac)
+  )
+  select count(*), min(c.code), min(c.name),
+         jsonb_agg(public.vmp_tl_goi_y(concat_ws(' · ', c.code, c.name, nullif(c.area, '—')),
+                                       'thiet_bi', jsonb_build_object('tu_khoa', c.code))
+                   order by c.name, c.code) filter (where c.rn <= 8)
+    into v_so, v_ma, v_ten, v_hoi
+    from (select chon.*, row_number() over (order by chon.name, chon.code) rn from chon) c;
+
+  if v_so = 0 then
+    return jsonb_build_object('ok', true, 'hieu_la', 'Thiết bị / đối tượng: ' || v_tk,
+      'tra_loi', format('Không thấy đối tượng nào khớp "%s" trong phạm vi bạn được xem. Thử gõ mã (vd KNTB133) hoặc một phần tên.', v_tk));
+  end if;
+
+  if v_so > 1 then
+    return jsonb_build_object('ok', true, 'hieu_la', 'Thiết bị / đối tượng: ' || v_tk,
+      'tra_loi', case when v_so <= 8 then format('Có %s đối tượng khớp "%s". Bạn chọn một:', v_so, v_tk)
+                      else format('Có %s đối tượng khớp "%s". Dưới đây là 8 cái đầu, gõ cụ thể hơn nếu chưa thấy:', v_so, v_tk) end,
+      'hoi_lai', v_hoi);
+  end if;
+
+  select count(*),
+         coalesce(jsonb_agg(public.vmp_tl_dong(h.validation_code, h.object_code, h.object_name,
+                    h.validation_type, h.deadline_vmp, h.so_ngay, h.owner_name, h.giai_doan)
+                  order by h.deadline_vmp nulls last, h.validation_code), '[]'::jsonb)
+    into v_tong, v_dong
+    from public.vmp_tl_hang_muc(p_uid) h
+   where h.object_code = v_ma;
+
+  -- Phiếu thay đổi cần thẩm định đang gắn với đối tượng này.
+  select coalesce(jsonb_agg(c.change_code order by c.change_code), '[]'::jsonb)
+    into v_cc
+    from public.vmp_change_records c
+    join public.vmp_change_objects co on co.change_id = c.id and co.object_code = v_ma
+   where c.needs_validation
+     and c.record_kind = 'thay_doi'
+     and c.removed_from_sheet_at is null
+     and c.handling_status in ('cho_xu_ly', 'dang_tham_dinh')
+     and public.vmp_change_can_view(p_uid, c.id);
+
+  return jsonb_build_object(
+    'ok', true,
+    'hieu_la', 'Thiết bị / đối tượng: ' || concat_ws(' · ', v_ma, v_ten),
+    'tra_loi', case when v_tong = 0
+        then format('%s (%s) không có hạng mục thẩm định nào năm %s.', v_ten, v_ma, extract(year from public.vmp_tl_hom_nay()))
+        else format('%s (%s) có %s hạng mục năm %s.', v_ten, v_ma, v_tong, extract(year from public.vmp_tl_hom_nay())) end
+      || case when jsonb_array_length(v_cc) > 0
+              then ' Phiếu thay đổi cần thẩm định đang mở: ' || (select string_agg(x, ', ') from jsonb_array_elements_text(v_cc) x) || '.'
+              else '' end,
+    'bang', case when v_tong > 0 then jsonb_build_object('cot', public.vmp_tl_cot_hang_muc(), 'dong', v_dong, 'tong_dong', v_tong) end,
+    'goi_y', case when jsonb_array_length(v_cc) > 0
+      then jsonb_build_array(public.vmp_tl_goi_y('Xem phiếu thay đổi của ' || v_ma, 'thay_doi', jsonb_build_object('loc', 'tat_ca', 'tu_khoa', v_ma)))
+      else '[]'::jsonb end);
+end
+$function$;
