@@ -517,8 +517,8 @@ async function chuanBiApV1(trang) {
     };
   });
 
-  kiem(kq.thuTu === "objects,coverage,products,alerts,revalidation,changes,import,pending,history",
-    "chín mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
+  kiem(kq.thuTu === "objects,coverage,products,alerts,revalidation,changes,deviations,import,pending,history",
+    "mười mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
   kiem(kq.coThem, "đủ quyền thấy nút Thêm");
   kiem(kq.coNhapExcel, "đủ quyền thấy mục Nhập Excel");
   kiem(!kq.coNguoiThucHien, "không còn chữ 'Người thực hiện' trên màn");
@@ -585,7 +585,7 @@ async function chuanBiApV1(trang) {
   });
 
   // Tab Thay đổi mở cho mọi vai; RPC lọc phiếu theo phạm vi xưởng.
-  kiem(kq.muc === "objects,changes",
+  kiem(kq.muc === "objects,changes,deviations",
     "nhân viên xưởng chỉ thấy đối tượng Source theo quyền", kq.muc || "(không thấy nav)");
   kiem(!kq.coThem, "nhân viên xưởng không thấy nút Thêm");
   kiem(!kq.coSua, "nhân viên xưởng không thấy nút Sửa");

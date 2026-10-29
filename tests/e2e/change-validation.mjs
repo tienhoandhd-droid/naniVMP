@@ -1,7 +1,8 @@
 /* E2E tab "Thay đổi" (thẩm định do thay đổi) trên khổ máy tính bảng.
  * Luồng: mở phiếu → gõ mã thiết bị → chọn gợi ý → Lưu → tick đợt thẩm định
  * → Lưu → nhãn thiết bị hiện trên bảng; lỗi xung đột hiện tại chỗ mà nút Lưu
- * không nhảy; nút Làm mới gửi yêu cầu; chế độ chỉ xem không có nút sửa. */
+ * không nhảy; nút Làm mới gửi yêu cầu; tab Sai lệch chỉ hiện phiếu sai lệch và ghi
+ * "Không có" khi trống; chế độ chỉ xem không có nút sửa. */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -38,6 +39,18 @@ const may = {
   syncStatus: "xong",
   saves: [],
   syncRequests: 0,
+  saiLech: [],
+};
+/* Phiếu từ sổ sai lệch; phiếu thay đổi ở banGhi() cố ý không có record_kind (máy chủ cũ). */
+const SAI_LECH = {
+  id: "7a1c2d3e-4f50-4617-8a9b-0c1d2e3f4a5b", record_kind: "sai_lech",
+  source_tab: "Sổ quản lý sai lệch (2026)", change_code: "DEV-2606-001", source_row: 3,
+  opened_text: "01/06/2026", department: "RD, QA, XSX", change_class: "Imanok · Lô 010626",
+  change_type: "Nhỏ", change_content: "Định lượng không đạt", sheet_status: "Đóng", owner_text: null,
+  folder_link: null, needs_validation: true, validation_content: "Thẩm định tank mới sau sửa xưởng",
+  deadline_raw: "31/08/2026", deadline_sheet: "2026-08-31", deadline_override: null, deadline: "2026-08-31",
+  removed_from_sheet_at: null, handling_status: "cho_xu_ly", note: null, version: 1,
+  updated_at: "2026-10-29T01:00:00+00:00", objects: [], plan_items: [],
 };
 const PLAN = {
   id: "CCTB01/2026.01-OQ", validation_code: "CCTB01/2026.01-OQ", object_code: "CCTB01",
@@ -81,7 +94,7 @@ try {
     previewOrigin: APP_URL,
     suaKho: (store) => {
       store.rpc_change_list = () => ({
-        ok: true, can_edit: may.canEdit, can_create_plan: may.canEdit, records: [banGhi()],
+        ok: true, can_edit: may.canEdit, can_create_plan: may.canEdit, records: [banGhi(), ...may.saiLech],
         sync: {
           last_ok_at: "2026-10-22T01:43:11+00:00", last_status: may.syncStatus, last_trigger: "lich",
           last_requested_at: null, last_finished_at: null, last_error: null, last_summary: null,
@@ -217,6 +230,41 @@ try {
     .find((b) => b.textContent?.includes("Làm mới"))?.click());
   await page.waitForFunction(() => document.body.innerText.includes("Đang cập nhật từ sheet"), { timeout: 10_000 });
   assert.equal(may.syncRequests, 1);
+
+  // 5b. Tab Sai lệch: trống thì ghi "Không có"; có phiếu thì chỉ hiện phiếu sai lệch
+  may.syncStatus = "xong";
+  await page.click('[data-cw-nav="deviations"]');
+  await page.waitForFunction(() => document.querySelector("section[aria-labelledby='tdd-heading'] h3")
+    ?.textContent?.includes("sai lệch"), { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelector("section[aria-labelledby='tdd-heading']")
+    ?.innerText.includes("Không có"), { timeout: 15_000 });
+  assert.equal(await page.$('button[aria-label="Sửa CC-XSX-2605-001"]'), null, "tab Sai lệch không hiện phiếu thay đổi");
+  may.saiLech = [SAI_LECH];
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForSelector('[data-cw-nav="deviations"]', { timeout: 15_000 });
+  await page.click('[data-cw-nav="deviations"]');
+  await page.waitForSelector('button[aria-label="Sửa DEV-2606-001"]', { timeout: 15_000 });
+  const saiLech = await page.$eval("section[aria-labelledby='tdd-heading']", (root) => ({
+    heading: root.querySelector("h3")?.textContent?.trim(),
+    headers: [...root.querySelectorAll("thead th")].map((node) => node.textContent?.trim()),
+    coCC: root.innerText.includes("CC-XSX-2605-001"),
+  }));
+  assert.deepEqual(saiLech, {
+    heading: "Thẩm định do sai lệch",
+    headers: ["Mã sai lệch", "Cần thẩm định", "Thiết bị", "Hạn", "Trạng thái", ""],
+    coCC: false,
+  });
+  await page.click('button[aria-label="Sửa DEV-2606-001"]');
+  await page.waitForSelector('[role="dialog"]');
+  const hopSaiLech = await page.$eval('[role="dialog"] .tdd-nguon', (el) => el.innerText);
+  assert.match(hopSaiLech, /Nội dung sai lệch[\s\S]*Định lượng không đạt/);
+  assert.match(hopSaiLech, /Imanok · Lô 010626/);
+  await page.evaluate(() => [...document.querySelectorAll('[role="dialog"] button')]
+    .find((b) => b.textContent?.trim() === "Huỷ")?.click());
+  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
+  await page.click('[data-cw-nav="changes"]');
+  await page.waitForSelector('button[aria-label="Sửa CC-XSX-2605-001"]', { timeout: 15_000 });
+  assert.equal(await page.$('button[aria-label="Sửa DEV-2606-001"]'), null, "tab Thay đổi không hiện phiếu sai lệch");
 
   // 6. Chỉ xem (vai xưởng): không có Làm mới, nút "Xem", hộp thoại không có Lưu
   may.canEdit = false;

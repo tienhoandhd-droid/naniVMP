@@ -22,6 +22,7 @@ const regions = [
   ["alerts", "Người nhận cảnh báo"],
   ["revalidation", "Tái thẩm định"],
   ["changes", "Thay đổi"],
+  ["deviations", "Sai lệch"],
   ["import", "Nhập Excel"],
   ["pending", "Chờ áp dụng"],
   ["history", "Lịch sử"],
@@ -119,7 +120,7 @@ try {
   await reader.waitForSelector(".cw-bang--objects tbody tr", { timeout: 15_000 });
   // "changes" không phải dữ liệu quản trị: RPC lọc phiếu theo phạm vi, chỉ QA sửa.
   await reader.waitForSelector('[data-cw-nav="changes"]', { timeout: 15_000 });
-  assert.deepEqual(await reader.$$eval("[data-cw-nav]", (nodes) => nodes.map((node) => node.getAttribute("data-cw-nav"))), ["objects", "changes"],
+  assert.deepEqual(await reader.$$eval("[data-cw-nav]", (nodes) => nodes.map((node) => node.getAttribute("data-cw-nav"))), ["objects", "changes", "deviations"],
     "object-only reader must not gain management regions");
   assert.equal(await reader.$("[data-cw-them], [data-cw-sua], [data-cw-export-count]"), null,
     "opening reader help must not grant any catalog mutation or export control");

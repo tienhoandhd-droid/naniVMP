@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CATALOG_HELP_CONTENT, getCatalogHelp } from "../../src/features/catalogWorkspace/catalogHelpContent.ts";
 
-const expectedRegions = ["objects", "coverage", "products", "alerts", "revalidation", "changes", "import", "pending", "history"];
+const expectedRegions = ["objects", "coverage", "products", "alerts", "revalidation", "changes", "deviations", "import", "pending", "history"];
 
 test("contextual guide covers every authorized catalog workspace region", () => {
   assert.deepEqual(Object.keys(CATALOG_HELP_CONTENT), expectedRegions);

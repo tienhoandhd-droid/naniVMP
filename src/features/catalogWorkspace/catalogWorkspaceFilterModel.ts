@@ -54,7 +54,7 @@ export interface CatalogSourceCursorStack {
 }
 
 export type CatalogWorkspaceRegionId =
-  | "objects" | "coverage" | "products" | "alerts" | "revalidation" | "changes" | "import" | "pending" | "history";
+  | "objects" | "coverage" | "products" | "alerts" | "revalidation" | "changes" | "deviations" | "import" | "pending" | "history";
 
 const SEARCH_FIELDS = [
   "object_code", "object_name", "department", "area_code", "line", "owner_name",
@@ -131,13 +131,13 @@ export function catalogWorkspaceRegionIds(input: {
   canGenerateTimeline: boolean;
   canManageWorkshopScope: boolean;
 }): CatalogWorkspaceRegionId[] {
-  /* Tab Thay đổi mở cho mọi vai: RPC tự lọc phiếu theo phạm vi và chỉ QA được sửa. */
+  /* Tab Thay đổi và Sai lệch mở cho mọi vai: RPC tự lọc phiếu theo phạm vi và chỉ QA được sửa. */
   if (input.businessRole === "qa_staff" || input.businessRole === "workshop_manager"
-    || input.businessRole === "workshop_staff") return ["objects", "changes"];
+    || input.businessRole === "workshop_staff") return ["objects", "changes", "deviations"];
   if (input.businessRole !== "admin" && input.businessRole !== "qa_manager") return ["objects"];
   const regions: CatalogWorkspaceRegionId[] = ["objects"];
   if (input.canManageWorkshopScope) regions.push("coverage");
-  regions.push("products", "alerts", "revalidation", "changes");
+  regions.push("products", "alerts", "revalidation", "changes", "deviations");
   if (input.canEdit) regions.push("import");
   if (input.canEdit && input.canGenerateTimeline) regions.push("pending");
   regions.push("history");

@@ -32,8 +32,12 @@ export interface ChangePlanItem {
   linked: boolean;
 }
 
+/** Nguồn của phiếu: sheet Tổng hợp thay đổi hay sổ quản lý sai lệch. */
+export type ChangeRecordKind = "thay_doi" | "sai_lech";
+
 export interface ChangeRecord {
   id: string;
+  recordKind: ChangeRecordKind;
   sourceTab: string;
   changeCode: string;
   sourceRow: number | null;
@@ -139,6 +143,7 @@ export function decodeChangeRecord(value: unknown): ChangeRecord {
   if (!Array.isArray(raw.objects) || !Array.isArray(raw.plan_items)) throw new Error("thiếu danh sách liên kết");
   return {
     id: text(raw.id, "id"),
+    recordKind: raw.record_kind === "sai_lech" ? "sai_lech" : "thay_doi",
     sourceTab: text(raw.source_tab, "tab nguồn"),
     changeCode: text(raw.change_code, "mã thay đổi"),
     sourceRow: optInt(raw.source_row),

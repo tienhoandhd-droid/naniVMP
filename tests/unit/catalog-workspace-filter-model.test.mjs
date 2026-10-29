@@ -158,7 +158,7 @@ test("lower Source roles get objects + changes only while managers receive only 
       canEdit: true,
       canGenerateTimeline: true,
       canManageWorkshopScope: true,
-    }), ["objects", "changes"]);
+    }), ["objects", "changes", "deviations"]);
   }
   assert.deepEqual(catalogWorkspaceRegionIds({
     businessRole: null,
@@ -172,13 +172,13 @@ test("lower Source roles get objects + changes only while managers receive only 
     canEdit: true,
     canGenerateTimeline: true,
     canManageWorkshopScope: true,
-  }), ["objects", "coverage", "products", "alerts", "revalidation", "changes", "import", "pending", "history"]);
+  }), ["objects", "coverage", "products", "alerts", "revalidation", "changes", "deviations", "import", "pending", "history"]);
   assert.deepEqual(catalogWorkspaceRegionIds({
     businessRole: "admin",
     canEdit: false,
     canGenerateTimeline: false,
     canManageWorkshopScope: false,
-  }), ["objects", "products", "alerts", "revalidation", "changes", "history"]);
+  }), ["objects", "products", "alerts", "revalidation", "changes", "deviations", "history"]);
 });
 
 test("Source controls keep lower roles read-only and require edit capability for mutations", () => {

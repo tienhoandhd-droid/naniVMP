@@ -22,6 +22,7 @@ import {
   type ChangeListResult,
   type ChangeObject,
   type ChangeRecord,
+  type ChangeRecordKind,
 } from "./contracts.ts";
 
 type LoadState = "loading" | "ready" | "error";
@@ -35,12 +36,33 @@ function todayVn(): string {
   return dayFormatter.format(new Date());
 }
 
+/* Chữ riêng cho từng nguồn: tab Thay đổi (sheet Tổng hợp thay đổi) và tab Sai lệch (sổ sai lệch). */
+const KIND_TEXT: Record<ChangeRecordKind, {
+  heading: string; caption: string; code: string; noun: string; empty: string; search: string;
+  content: string; classLabel: string; deptLabel: string; deadline: string;
+}> = {
+  thay_doi: {
+    heading: "Thẩm định do thay đổi", caption: "Phiếu thay đổi cần thẩm định", code: "Mã thay đổi", noun: "phiếu thay đổi",
+    empty: "Chưa có phiếu thay đổi cần thẩm định", search: "Mã CC, nội dung, mã thiết bị",
+    content: "Nội dung thay đổi", classLabel: "Loại", deptLabel: "Phòng ban · phụ trách",
+    deadline: "Hạn thẩm định (theo sheet)",
+  },
+  sai_lech: {
+    heading: "Thẩm định do sai lệch", caption: "Sai lệch cần thẩm định", code: "Mã sai lệch", noun: "sai lệch",
+    // Chủ dự án chốt 29/10: không có dòng cần thẩm định thì ghi "Không có".
+    empty: "Không có", search: "Mã DEV, nội dung, mã thiết bị",
+    content: "Nội dung sai lệch", classLabel: "Sản phẩm · mức độ", deptLabel: "Bộ phận liên quan",
+    deadline: "Hạn CAPA (theo sheet)",
+  },
+};
+
 /* "PCTB1305 · Khu B3 · TP sinh phẩm mới · XSX" — đủ để phân biệt các thiết bị tên giống nhau. */
 function objectDetail(o: ChangeObject): string {
   return [o.code, o.area ? `Khu ${o.area}` : null, o.line, o.department?.toUpperCase()].filter(Boolean).join(" · ");
 }
 
-export default function ChangeValidationPanel() {
+export default function ChangeValidationPanel({ kind }: { kind: ChangeRecordKind }) {
+  const label = KIND_TEXT[kind];
   const [data, setData] = useState<ChangeListResult | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
@@ -91,15 +113,17 @@ export default function ChangeValidationPanel() {
   }, [syncBusy, data, load]);
 
   const today = todayVn();
-  const rows = useMemo(() => data ? filterChanges(data.records, filter, query, today) : [],
-    [data, filter, query, today]);
+  const kindRecords = useMemo(() => data ? data.records.filter((row) => row.recordKind === kind) : [],
+    [data, kind]);
+  const rows = useMemo(() => filterChanges(kindRecords, filter, query, today),
+    [kindRecords, filter, query, today]);
   const canEdit = data?.canEdit === true;
   const openRecord = data?.records.find((row) => row.id === openId) ?? null;
 
   const columns = useMemo<SmartTableColumn<ChangeRecord>[]>(() => [
     {
       id: "code",
-      header: "Mã thay đổi",
+      header: label.code,
       priority: "primary",
       cell: (row) => (
         <div className="rv-code">
@@ -157,7 +181,7 @@ export default function ChangeValidationPanel() {
         </button>
       ),
     },
-  ], [canEdit, today]);
+  ], [canEdit, today, label]);
 
   const requestSync = async () => {
     if (!canEdit || requesting) return;
@@ -183,7 +207,7 @@ export default function ChangeValidationPanel() {
     <section className="rv-panel" aria-labelledby="tdd-heading">
       <header className="rv-toolbar">
         <div>
-          <h3 id="tdd-heading">Thẩm định do thay đổi</h3>
+          <h3 id="tdd-heading">{label.heading}</h3>
           <p aria-live="polite">{syncLine}</p>
         </div>
         <div className="rv-toolbar__actions">
@@ -200,7 +224,7 @@ export default function ChangeValidationPanel() {
           <label className="rv-filter" htmlFor="tdd-tim">
             <span>Tìm</span>
             <input id="tdd-tim" className="cw-o" type="search" value={query}
-              placeholder="Mã CC, nội dung, mã thiết bị" onChange={(event) => setQuery(event.target.value)} />
+              placeholder={label.search} onChange={(event) => setQuery(event.target.value)} />
           </label>
           {canEdit && (
             <button type="button" className="cw-nut" disabled={requesting || syncBusy} onClick={requestSync}>
@@ -219,17 +243,17 @@ export default function ChangeValidationPanel() {
         </p>
       )}
 
-      {loadState === "loading" && <StateBoundary state="loading" title="Đang tải phiếu thay đổi" skeletonRows={5} />}
+      {loadState === "loading" && <StateBoundary state="loading" title={`Đang tải ${label.noun}`} skeletonRows={5} />}
       {loadState === "error" && (
-        <StateBoundary state="error" title="Chưa tải được phiếu thay đổi" description={error}
+        <StateBoundary state="error" title={`Chưa tải được ${label.noun}`} description={error}
           onRetry={() => setTick((value) => value + 1)} />
       )}
-      {loadState === "ready" && data && data.records.length === 0 && (
-        <StateBoundary state="empty" title="Chưa có phiếu thay đổi cần thẩm định"
+      {loadState === "ready" && data && kindRecords.length === 0 && (
+        <StateBoundary state="empty" title={label.empty}
           description={canEdit ? "Bấm Làm mới để lấy từ sheet." : undefined} />
       )}
-      {loadState === "ready" && data && data.records.length > 0 && (
-        <SmartTable caption="Phiếu thay đổi cần thẩm định" rows={rows} rowKey={(row) => row.id}
+      {loadState === "ready" && data && kindRecords.length > 0 && (
+        <SmartTable caption={label.caption} rows={rows} rowKey={(row) => row.id}
           columns={columns} empty="Không có phiếu nào khớp bộ lọc." />
       )}
 
@@ -262,6 +286,7 @@ function ChangeDialog({ row: liveRow, canEdit, canCreatePlan, onClose, onChanged
 }) {
   /* Giữ bản lúc mở: lưu bằng phiên bản này để máy chủ phát hiện người khác vừa sửa. */
   const [row] = useState(liveRow);
+  const label = KIND_TEXT[row.recordKind];
   const changedElsewhere = liveRow.version !== row.version;
   const [objects, setObjects] = useState<ChangeObject[]>(row.objects);
   const [planIds, setPlanIds] = useState<string[]>(row.planItems.filter((p) => p.linked).map((p) => p.id));
@@ -329,9 +354,9 @@ function ChangeDialog({ row: liveRow, canEdit, canCreatePlan, onClose, onChanged
         <p className="cw-loi" role="status">Người khác vừa sửa phiếu này. Đóng rồi mở lại để xem bản mới.</p>
       )}
       <dl className="tdd-nguon">
-        <div><dt>Nội dung thay đổi</dt><dd>{row.changeContent ?? "—"}</dd></div>
-        <div><dt>Loại</dt><dd>{[row.changeClass, row.changeType].filter(Boolean).join(" · ") || "—"}</dd></div>
-        <div><dt>Phòng ban · phụ trách</dt><dd>{[row.department, row.ownerText].filter(Boolean).join(" · ") || "—"}</dd></div>
+        <div><dt>{label.content}</dt><dd>{row.changeContent ?? "—"}</dd></div>
+        <div><dt>{label.classLabel}</dt><dd>{[row.changeClass, row.changeType].filter(Boolean).join(" · ") || "—"}</dd></div>
+        <div><dt>{label.deptLabel}</dt><dd>{[row.department, row.ownerText].filter(Boolean).join(" · ") || "—"}</dd></div>
         {row.removedFromSheetAt && (
           <div><dt>Sheet</dt><dd>Đã bỏ yêu cầu thẩm định lúc {formatBangkokShortDateTime(row.removedFromSheetAt)}</dd></div>
         )}
@@ -366,7 +391,7 @@ function ChangeDialog({ row: liveRow, canEdit, canCreatePlan, onClose, onChanged
 
       <div className="tdd-luoi">
         <div className="cw-truong">
-          <span className="cw-nhan">Hạn thẩm định (theo sheet)</span>
+          <span className="cw-nhan">{label.deadline}</span>
           <b className="tdd-han">{row.deadlineSheet ? formatBangkokDate(row.deadlineSheet) : "Sheet chưa ghi ngày"}</b>
           {row.deadlineRaw && row.deadlineRaw !== (row.deadlineSheet ? formatBangkokDate(row.deadlineSheet) : "") && (
             <span className="cw-nhe">Sheet ghi: {row.deadlineRaw}</span>
