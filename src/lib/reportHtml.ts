@@ -11,6 +11,7 @@ import { fmtVN } from "../utils/helpers.ts";
 import { LOAI_LOI, SEV, sevOf } from "../constants/vmp.ts";
 import { svgMonthlyTargetChart, svgDeptBottleneckChart, svgDeptWorkloadChart, deptColorMap, EXPORT_PALETTE } from "./reportCharts.ts";
 import type { YtdSummary, CurrentMonthSummary, DeptBottleneckRow, NextMonthWork } from "./reportModel.ts";
+import { CHANGE_KIND_LABEL, changeSummarySub, type ChangeSummary } from "../features/changeValidation/changeSummary.ts";
 
 export interface QualityIssueLike { type: string; severity: string; id: string; msg: string }
 
@@ -26,6 +27,9 @@ export interface ManagementReportInput {
    *  kể cả phần chưa được người xác nhận. Bỏ hẳn khỏi bản in là đảo một
    *  quyết định thiết kế của chủ dự án, không phải việc của bản sửa lỗi. */
   ai?: string;
+  /** Chỉ số bổ sung từ phiếu Thay đổi / Sai lệch (hạn trong năm `year`).
+   *  summary null = chưa tải được; `note` nói lý do. */
+  changes?: { year: number; summary: ChangeSummary | null; note?: string };
 }
 
 const esc = (s: unknown): string =>
@@ -34,6 +38,20 @@ const esc = (s: unknown): string =>
 function pctBadge(rate: number): string {
   const cls = rate >= 80 ? "good" : rate >= 50 ? "mid" : "bad";
   return `<span class="badge ${cls}">${rate}%</span>`;
+}
+
+/* Khối "Dữ liệu bổ sung — phiếu Thay đổi / Sai lệch" ở mục 1 của bản in. */
+function changesHtml(changes: ManagementReportInput["changes"]): string {
+  if (!changes) return "";
+  const { year, summary } = changes;
+  if (!summary) return `<p><b>Phiếu Thay đổi / Sai lệch:</b> ${esc(changes.note ?? "Chưa có số liệu")}</p>`;
+  const tiles = (["thay_doi", "sai_lech"] as const).map((kind) => {
+    const k = summary[kind];
+    const value = k.rate == null ? "—" : `${k.rate}%`;
+    return `<div><div class="v">${value}</div><div class="l">${esc(CHANGE_KIND_LABEL[kind])} hoàn thành ${year} (${esc(changeSummarySub(k))})</div></div>`;
+  }).join("");
+  return `<p><b>Dữ liệu bổ sung — phiếu Thay đổi / Sai lệch</b> (hạn trong năm ${year}, toàn bộ phiếu, không theo bộ lọc bộ phận)</p>
+<div class="kpi">${tiles}</div>`;
 }
 
 export function buildManagementReportHTML(d: ManagementReportInput): string {
@@ -51,6 +69,8 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
 
   const stageRows = d.ytd.byStage.map((s) =>
     `<tr><td style="text-align:left">${esc(s.label)}</td><td>${s.count}</td></tr>`).join("");
+
+  const changesBlock = changesHtml(d.changes);
 
   const KY_LABEL = { da_qua: "Đã qua", dang_dien_ra: "Đang diễn ra", chua_toi: "Chưa tới kỳ" };
   const monthTableRows = d.monthly.table.map((r) => {
@@ -142,6 +162,7 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
 <tr><td style="text-align:left">Hoàn thành VMP</td><td>${d.ytd.vmp.done}</td><td class="${d.ytd.vmp.over ? "over" : ""}">${d.ytd.vmp.over}</td><td>${d.ytd.vmp.todo}</td><td>${pctBadge(d.ytd.vmp.rate)}</td></tr>
 </table>
 <table><tr><th>Trạng thái hiện tại</th><th>Số hạng mục</th></tr>${stageRows}</table>
+${changesBlock}
 
 <h2>2. Tổng quan kỳ ${esc(d.monthly.label)}</h2>
 <div class="kpi">

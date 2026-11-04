@@ -218,6 +218,8 @@
     "k1"
     "k2"
     "k4"
+    "tdoi"
+    "slech"
     "vali"
     "wide"
     "sau";
@@ -230,6 +232,7 @@
       "hero hero"
       "k1   k2"
       "k4   k4"
+      "tdoi slech"
       "vali vali"
       "wide wide"
       "sau  sau";
@@ -242,11 +245,16 @@
     grid-template-areas:
       "hero hero hero"
       "k1   k2   k4"
+      "tdoi tdoi slech"
       "vali vali vali"
       "wide wide wide"
       "sau  sau  sau";
   }
 }
+
+/* Chỉ số bổ sung: phiếu Thay đổi / Sai lệch (04/11/2026). */
+.vmp-bento > .b-tdoi  { grid-area: tdoi; align-self: stretch; }
+.vmp-bento > .b-slech { grid-area: slech; align-self: stretch; }
 
 /* Alerts is a command center first, then a management view. */
 .alerts-page-shell {

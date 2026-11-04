@@ -40,6 +40,9 @@ import {
   svgMonthlyTargetChart, svgDeptBottleneckChart, svgDeptWorkloadChart, deptColorMap, SCREEN_PALETTE,
 } from "../../lib/reportCharts.ts";
 import { buildManagementReportHTML } from "../../lib/reportHtml.ts";
+import ChangeSummaryTiles from "../../features/changeValidation/ChangeSummaryTiles.tsx";
+import { useChangeSummary } from "../../features/changeValidation/useChangeSummary.ts";
+import { CHANGE_KIND_LABEL } from "../../features/changeValidation/changeSummary.ts";
 import { chayPhanTichAi, aiConfigured, AI_SETUP_HINT, AI_NHAN } from "../../lib/aiReport.ts";
 import type { AiKind } from "../../lib/aiReport.ts";
 import AiMailModal from "../ai/AiMailModal.tsx";
@@ -170,6 +173,11 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
   const scopedKyActive = useMemo(() => chiActive(scopedKy), [scopedKy]);
 
   const ytdNam = useMemo(() => ytdSummary(scopedNam), [scopedNam]);
+  const changeSummary = useChangeSummary(ky.year);
+  /* Bản in/Excel chỉ mang số liệu khi đã tải xong; lỗi/đang tải thì ghi rõ. */
+  const changes = changeSummary.status === "ready"
+    ? { year: ky.year, summary: changeSummary.summary }
+    : { year: ky.year, summary: null, note: changeSummary.status === "error" ? changeSummary.message : "Đang tải" };
   const ytd = useMemo(() => ytdSummary(scopedKy), [scopedKy]);
   const monthly = useMemo(() => periodSummary(scoped, ky, TARGET_PCT), [scoped, ky]);
   const bottleneck = useMemo(() => stageBottleneck(scopedKy), [scopedKy]);
@@ -321,7 +329,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       else dang.hong("Không mở được hộp in. Tải bản HTML để in.");
     };
     try {
-      const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
+      const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai, changes });
       ifr = document.createElement("iframe");
       ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
       document.body.appendChild(ifr);
@@ -342,7 +350,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
   const downloadHtml = () => {
     try {
-      const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai });
+      const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai, changes });
       download(`BaoCaoQuanLy_VMP_${tenTepKy()}.html`, html);
       toast.thanhCong("Đã tải báo cáo HTML.");
     } catch {
@@ -371,6 +379,17 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       [], ["Kỳ đang xem", kyLabel],
       ["Cần hoàn thành trong kỳ", monthly.cur.due], ["Đã hoàn thành trong kỳ", monthly.cur.done],
       ["Tỷ lệ kỳ này (%)", monthly.cur.rate ?? "—"], ["Tỷ lệ kỳ trước (%)", monthly.prev?.rate ?? "—"],
+      [], [`Phiếu Thay đổi / Sai lệch — hạn trong năm ${changes.year}, toàn bộ phiếu (không theo bộ lọc bộ phận)`],
+      ...(changes.summary
+        ? (["thay_doi", "sai_lech"] as const).flatMap((kind) => {
+          const k = changes.summary[kind];
+          const ten = CHANGE_KIND_LABEL[kind];
+          return [
+            [`${ten} hoàn thành (%)`, k.rate ?? "—"], [`${ten} — đã xong`, k.done], [`${ten} — tổng phiếu`, k.total],
+            [`${ten} — quá hạn`, k.overdue], [`${ten} — chưa có hạn (không tính)`, k.noDeadline],
+          ];
+        })
+        : [["Trạng thái", changes.note]]),
     ];
 
     const KY_LABEL = { da_qua: "Đã qua", dang_dien_ra: "Đang diễn ra", chua_toi: "Chưa tới kỳ" };
@@ -547,6 +566,12 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
             )}
           </div>
         )}
+        <div style={{ marginTop: 18, marginBottom: 10, fontSize: 12, color: C.plumSoft, fontWeight: 800, letterSpacing: ".04em" }}>
+          DỮ LIỆU BỔ SUNG — phiếu Thay đổi / Sai lệch
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
+          <ChangeSummaryTiles state={changeSummary} year={ky.year} />
+        </div>
         <TableScroll maxHeight={280} hint={false}>
           {/* Bề mặt sổ (analysis.css): kẻ dòng, tiêu đề dính, caption cho
               trình đọc màn hình. Cột số căn PHẢI — Be Vietnam Pro không có

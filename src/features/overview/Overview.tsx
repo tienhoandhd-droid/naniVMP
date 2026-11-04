@@ -10,6 +10,8 @@ import { bangkokCalendarDate, classifyVmpDeadline } from "../../lib/vmpDeadlineM
 import VongNam from "../../components/dashboard/VongNam.tsx";
 import CompletionDashboard from "../../components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "../../components/dashboard/MaTranTienDo.tsx";
+import ChangeSummaryTiles from "../changeValidation/ChangeSummaryTiles.tsx";
+import { useChangeSummary } from "../changeValidation/useChangeSummary.ts";
 
 export default function Overview({ acts, setView, access }: {
   acts: Activity[];
@@ -38,9 +40,11 @@ export default function Overview({ acts, setView, access }: {
     overdue: overviewTarget(access, "overdue"),
     soon: overviewTarget(access, "soon"),
     dataQuality: overviewTarget(access, "data-quality"),
+    changes: overviewTarget(access, "changes"),
   }), [access]);
   const di = (v: ScreenId | null) => (v && setView ? () => setView(v) : undefined);
   const soLoiDl = useMemo(() => runDataQualityChecks(acts).length, [acts]);
+  const changeSummary = useChangeSummary(currentBangkokYear);
 
   return (
     <div className="vmp-bento vmp-stagger">
@@ -129,6 +133,11 @@ export default function Overview({ acts, setView, access }: {
         sub={soLoiDl
           ? `trong đó ${mismatched.length} lệch pha`
           : "Không có vấn đề"} />
+
+      {/* Chỉ số BỔ SUNG từ phiếu Thay đổi / Sai lệch — không trộn vào tỉ lệ VMP. */}
+      <ChangeSummaryTiles state={changeSummary} year={currentBangkokYear}
+        clsFor={(kind) => (kind === "thay_doi" ? "b-tdoi" : "b-slech")}
+        onOpen={di(destinations.changes)} />
 
       <div className="b-vali">
         <PrincessCommentary stats={{
