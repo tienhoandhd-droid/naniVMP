@@ -104,11 +104,14 @@ try {
         suaKho(kho) {
           for (const rpc of ['rpc_get_vmp_dashboard','rpc_get_vmp_dashboard_v2']) {
             const base = kho[rpc].activities[0];
-            const deadline = new Date(Date.now() + 5 * 86400000).toISOString().slice(0,10);
+            // Tính hạn theo CÙNG đồng hồ với trình duyệt: CI đóng băng ở VMP_E2E_NOW.
+            // Dùng giờ thật thì hạn trôi ra ngoài cửa sổ ±30 ngày của Long Môn → 0 cá.
+            const testNowMs = process.env.VMP_E2E_NOW ? Date.parse(process.env.VMP_E2E_NOW) : Date.now();
+            const deadline = new Date(testNowMs + 5 * 86400000).toISOString().slice(0,10);
             kho[rpc].activities = Array.from({length:count}, (_, i) => ({...base,
               id:`pond-${i}`, code:`POND-${i}`, name:`Thiết bị thử ${i}`, state:'active',
               target:deadline, dlVmp:deadline, canonicalDeadline:deadline, canonical_deadline:deadline,
-              days_left:5, status_as_of:new Date().toISOString().slice(0,10),
+              days_left:5, status_as_of:new Date(testNowMs).toISOString().slice(0,10),
               _raw:{...base._raw, id:`pond-${i}`, dl_vmp:deadline, deadline_vmp:deadline, state:'active'},
             }));
           }

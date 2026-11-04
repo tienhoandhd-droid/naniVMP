@@ -128,13 +128,16 @@ try {
       suaKho(kho) {
         for (const rpc of ["rpc_get_vmp_dashboard", "rpc_get_vmp_dashboard_v2"]) {
           const base = kho[rpc].activities[0];
-          const deadline = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
+          // Cùng đồng hồ với trình duyệt (CI đóng băng ở VMP_E2E_NOW); giờ thật làm hạn
+          // trôi ra ngoài cửa sổ ±30 ngày của Long Môn → không có cá nào.
+          const testNowMs = process.env.VMP_E2E_NOW ? Date.parse(process.env.VMP_E2E_NOW) : Date.now();
+          const deadline = new Date(testNowMs + 5 * 86_400_000).toISOString().slice(0, 10);
           kho[rpc].activities = Array.from({ length: 150 }, (_, index) => ({ ...base,
             id: `living-${index}`, code: `LIVING-${index}`, name: `Hồ sống ${index}`, state: "active",
             crit: index % 3 === 0 ? "Cao" : index % 3 === 1 ? "TB" : "Thấp",
             criticality: index % 3 === 0 ? "high" : index % 3 === 1 ? "medium" : "low",
             target: deadline, dlVmp: deadline, canonicalDeadline: deadline, canonical_deadline: deadline,
-            days_left: 5, status_as_of: new Date().toISOString().slice(0, 10),
+            days_left: 5, status_as_of: new Date(testNowMs).toISOString().slice(0, 10),
             _raw: { ...base._raw, id: `living-${index}`, dl_vmp: deadline, deadline_vmp: deadline, state: "active" },
           }));
         }
