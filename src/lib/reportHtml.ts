@@ -30,6 +30,9 @@ export interface ManagementReportInput {
   /** Chỉ số bổ sung từ phiếu Thay đổi / Sai lệch (hạn trong năm `year`).
    *  summary null = chưa tải được; `note` nói lý do. */
   changes?: { year: number; summary: ChangeSummary | null; note?: string };
+  /** Ghi chú cạnh "Hoàn thành VMP": tỉ lệ đã gồm bao nhiêu phiếu thay đổi/sai
+   *  lệch chưa gắn đợt, hoặc vì sao chưa gồm. Rỗng = không có phiếu nào. */
+  vmpChangeNote?: string;
 }
 
 const esc = (s: unknown): string =>
@@ -151,7 +154,7 @@ export function buildManagementReportHTML(d: ManagementReportInput): string {
   <div><div class="v">${d.ytd.protocol.rate}%</div><div class="l">Đề cương hoàn thành (${d.ytd.protocol.done}/${d.ytd.protocol.total})</div></div>
   <div><div class="v">${d.ytd.validation.rate}%</div><div class="l">Thẩm định thực tế (${d.ytd.validation.done}/${d.ytd.validation.total})</div></div>
   <div><div class="v">${d.ytd.documentation.rate}%</div><div class="l">Hồ sơ hoàn thiện (${d.ytd.documentation.done}/${d.ytd.documentation.total})</div></div>
-  <div><div class="v">${d.ytd.vmp.rate}%</div><div class="l">Hoàn thành VMP (${d.ytd.vmp.done}/${d.ytd.vmp.total})</div></div>
+  <div><div class="v">${d.ytd.vmp.rate}%</div><div class="l">Hoàn thành VMP (${d.ytd.vmp.done}/${d.ytd.vmp.total}${d.vmpChangeNote ? ` · ${esc(d.vmpChangeNote)}` : ""})</div></div>
   <div><div class="v">${d.ytd.vmp.over}</div><div class="l">Đang quá hạn VMP</div></div>
 </div>
 <table>

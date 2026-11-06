@@ -54,3 +54,21 @@ test("bản in có khối Thay đổi / Sai lệch cạnh tỉ lệ hoàn thành
   // Không truyền changes (bản gọi cũ) thì không có khối này.
   assert.doesNotMatch(buildManagementReportHTML(base), /Thay đổi hoàn thành/);
 });
+
+test("bản in ghi rõ tỉ lệ Hoàn thành VMP đã gồm hay chưa gồm phiếu thay đổi/sai lệch", () => {
+  const ky = periodNow();
+  const base = {
+    scopeLabel: "Toàn nhà máy",
+    ytd: { ...ytdSummary([]), vmp: { done: 54, over: 13, todo: 53, total: 120, rate: 45 } },
+    monthly: periodSummary([], ky, 50),
+    bottleneck: stageBottleneck([]),
+    nextMonth: periodWork([], nextPeriod(ky)),
+    quality: [],
+  };
+  assert.match(buildManagementReportHTML({ ...base, vmpChangeNote: "gồm 20 phiếu thay đổi/sai lệch" }),
+    /Hoàn thành VMP \(54\/120 · gồm 20 phiếu thay đổi\/sai lệch\)/);
+  assert.match(buildManagementReportHTML({ ...base, vmpChangeNote: "chưa gồm phiếu thay đổi/sai lệch (đang lọc)" }),
+    /Hoàn thành VMP \(54\/120 · chưa gồm phiếu thay đổi\/sai lệch \(đang lọc\)\)/);
+  // Không có phiếu nào (ghi chú rỗng) → giữ nguyên dạng cũ.
+  assert.match(buildManagementReportHTML({ ...base, vmpChangeNote: "" }), /Hoàn thành VMP \(54\/120\)</);
+});

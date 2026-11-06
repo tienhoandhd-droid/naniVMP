@@ -12,6 +12,9 @@ import CompletionDashboard from "../../components/dashboard/CompletionDashboard.
 import MaTranTienDo from "../../components/dashboard/MaTranTienDo.tsx";
 import ChangeSummaryTiles from "../changeValidation/ChangeSummaryTiles.tsx";
 import { useChangeSummary } from "../changeValidation/useChangeSummary.ts";
+import { countUnlinkedChanges, vmpRateWithChanges } from "../changeValidation/changeSummary.ts";
+
+const CA_NAM = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export default function Overview({ acts, setView, access }: {
   acts: Activity[];
@@ -45,6 +48,12 @@ export default function Overview({ acts, setView, access }: {
   const di = (v: ScreenId | null) => (v && setView ? () => setView(v) : undefined);
   const soLoiDl = useMemo(() => runDataQualityChecks(acts).length, [acts]);
   const changeSummary = useChangeSummary(currentBangkokYear);
+  /* Tỉ lệ ở vòng năm gộp cả phiếu thay đổi/sai lệch chưa gắn đợt (luật 04/11).
+     Đang tải hoặc lỗi phiếu thì giữ tỉ lệ VMP gốc và ghi rõ là chưa gộp. */
+  const phieuChuaGan = useMemo(() => (changeSummary.status === "ready"
+    ? countUnlinkedChanges(changeSummary.records, currentBangkokYear, CA_NAM, changeSummary.today)
+    : null), [changeSummary, currentBangkokYear]);
+  const vongRate = phieuChuaGan ? vmpRateWithChanges(e, phieuChuaGan).rate : e.rate;
 
   return (
     <div className="vmp-bento vmp-stagger">
@@ -56,7 +65,7 @@ export default function Overview({ acts, setView, access }: {
             Vòng năm nói được thứ tổng quát hơn và đọc thẳng từ hình: cả 12
             tháng khép kín, khối lượng từng tháng, phần đã xong, và kim chỉ
             mình đang đứng ở đâu trong năm. */}
-        <VongNam acts={acts} rate={e.rate} total={e.total}
+        <VongNam acts={acts} rate={vongRate} total={e.total}
           year={currentBangkokYear} bangkokToday={currentBangkokDate} ben={
           <div className="vmp-overview-progress" data-overview-total={e.total} style={{ minWidth: 0 }}>
             <div style={{ fontFamily: TEXT, fontSize: 20, fontWeight: 800,
@@ -65,6 +74,13 @@ export default function Overview({ acts, setView, access }: {
             </div>
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginBottom: 15 }}>
               {e.total} hạng mục trong kế hoạch năm
+              {(!phieuChuaGan || phieuChuaGan.total > 0) && (
+                <div data-overview-change-note>
+                  {phieuChuaGan
+                    ? `Tỉ lệ gồm ${phieuChuaGan.total} phiếu thay đổi/sai lệch`
+                    : "Tỉ lệ chưa gồm phiếu thay đổi/sai lệch"}
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>

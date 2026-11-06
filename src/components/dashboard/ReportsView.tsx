@@ -33,7 +33,7 @@ import NhomTab, { NhomTabPanel, useNhomTab } from "../ui/NhomTab.tsx";
 import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import {
   ytdSummary, periodSummary, stageBottleneck, periodWork, buildRawRows,
-  periodNow, periodLabel, periodPhase, nextPeriod, actInPeriod, countNoTarget, hanVmp,
+  periodNow, periodLabel, periodPhase, nextPeriod, actInPeriod, countNoTarget, hanVmp, periodMonths,
 } from "../../lib/reportModel.ts";
 import type { Period, PeriodKind } from "../../lib/reportModel.ts";
 import {
@@ -42,7 +42,9 @@ import {
 import { buildManagementReportHTML } from "../../lib/reportHtml.ts";
 import ChangeSummaryTiles from "../../features/changeValidation/ChangeSummaryTiles.tsx";
 import { useChangeSummary } from "../../features/changeValidation/useChangeSummary.ts";
-import { CHANGE_KIND_LABEL } from "../../features/changeValidation/changeSummary.ts";
+import {
+  CHANGE_KIND_LABEL, countUnlinkedChanges, vmpRateWithChanges, type UnlinkedChangeCount,
+} from "../../features/changeValidation/changeSummary.ts";
 import { chayPhanTichAi, aiConfigured, AI_SETUP_HINT, AI_NHAN } from "../../lib/aiReport.ts";
 import type { AiKind } from "../../lib/aiReport.ts";
 import AiMailModal from "../ai/AiMailModal.tsx";
@@ -179,6 +181,26 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
     ? { year: ky.year, summary: changeSummary.summary }
     : { year: ky.year, summary: null, note: changeSummary.status === "error" ? changeSummary.message : "Đang tải" };
   const ytd = useMemo(() => ytdSummary(scopedKy), [scopedKy]);
+  /* Phiếu thay đổi/sai lệch chưa gắn đợt là một phần của tỉ lệ Hoàn thành VMP
+     (luật 04/11): màn hình đếm theo NĂM (như ytdNam), Excel/bản in theo KỲ
+     (như ytd). Phiếu không lọc được theo bộ phận/khu vực/trọng yếu, nên chỉ
+     gộp khi xem toàn nhà máy không lọc; còn lại giữ tỉ lệ VMP gốc và ghi rõ. */
+  const khongLoc = deptScope === "all" && !areaSel.length && !critSel.length;
+  const phieuNam = useMemo(() => (khongLoc && changeSummary.status === "ready"
+    ? countUnlinkedChanges(changeSummary.records, ky.year, periodMonths({ ...ky, kind: "nam" }), changeSummary.today)
+    : null), [khongLoc, changeSummary, ky]);
+  const phieuKy = useMemo(() => (khongLoc && changeSummary.status === "ready"
+    ? countUnlinkedChanges(changeSummary.records, ky.year, periodMonths(ky), changeSummary.today)
+    : null), [khongLoc, changeSummary, ky]);
+  const vmpNam = phieuNam ? vmpRateWithChanges(ytdNam.vmp, phieuNam) : ytdNam.vmp;
+  const ytdIn = useMemo(
+    () => (phieuKy ? { ...ytd, vmp: vmpRateWithChanges(ytd.vmp, phieuKy) } : ytd),
+    [ytd, phieuKy],
+  );
+  const lyDoChuaGop = !khongLoc ? "đang lọc" : changeSummary.status === "error" ? "lỗi tải phiếu" : "đang tải phiếu";
+  const ghiChuPhieu = (n: UnlinkedChangeCount | null): string => (n
+    ? (n.total ? `gồm ${n.total} phiếu thay đổi/sai lệch` : "")
+    : `chưa gồm phiếu thay đổi/sai lệch (${lyDoChuaGop})`);
   const monthly = useMemo(() => periodSummary(scoped, ky, TARGET_PCT), [scoped, ky]);
   const bottleneck = useMemo(() => stageBottleneck(scopedKy), [scopedKy]);
   const nextMonth = useMemo(() => periodWork(scoped, nextPeriod(ky)), [scoped, ky]);
@@ -329,7 +351,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       else dang.hong("Không mở được hộp in. Tải bản HTML để in.");
     };
     try {
-      const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai, changes });
+      const html = buildManagementReportHTML({ scopeLabel, ytd: ytdIn, vmpChangeNote: ghiChuPhieu(phieuKy), monthly, bottleneck, nextMonth, quality, ai, changes });
       ifr = document.createElement("iframe");
       ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
       document.body.appendChild(ifr);
@@ -350,7 +372,7 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
 
   const downloadHtml = () => {
     try {
-      const html = buildManagementReportHTML({ scopeLabel, ytd, monthly, bottleneck, nextMonth, quality, ai, changes });
+      const html = buildManagementReportHTML({ scopeLabel, ytd: ytdIn, vmpChangeNote: ghiChuPhieu(phieuKy), monthly, bottleneck, nextMonth, quality, ai, changes });
       download(`BaoCaoQuanLy_VMP_${tenTepKy()}.html`, html);
       toast.thanhCong("Đã tải báo cáo HTML.");
     } catch {
@@ -375,7 +397,8 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
       ["Đề cương hoàn thành (%)", ytd.protocol.rate], ["Đề cương — đã xong", ytd.protocol.done], ["Đề cương — quá hạn", ytd.protocol.over],
       ["Thẩm định thực tế (%)", ytd.validation.rate], ["Thẩm định — đã xong", ytd.validation.done], ["Thẩm định — quá hạn", ytd.validation.over],
       ["Hồ sơ hoàn thiện (%)", ytd.documentation.rate], ["Hồ sơ — đã xong", ytd.documentation.done], ["Hồ sơ — quá hạn", ytd.documentation.over],
-      ["Hoàn thành VMP (%)", ytd.vmp.rate], ["VMP — đã xong", ytd.vmp.done], ["VMP — quá hạn", ytd.vmp.over],
+      ["Hoàn thành VMP (%)", ytdIn.vmp.rate], ["VMP — đã xong", ytdIn.vmp.done], ["VMP — quá hạn", ytdIn.vmp.over],
+      ["VMP — phiếu thay đổi/sai lệch chưa gắn đợt", phieuKy ? phieuKy.total : `Chưa gồm (${lyDoChuaGop})`],
       [], ["Kỳ đang xem", kyLabel],
       ["Cần hoàn thành trong kỳ", monthly.cur.due], ["Đã hoàn thành trong kỳ", monthly.cur.done],
       ["Tỷ lệ kỳ này (%)", monthly.cur.rate ?? "—"], ["Tỷ lệ kỳ trước (%)", monthly.prev?.rate ?? "—"],
@@ -529,8 +552,9 @@ export default function ReportsView({ acts }: { acts: Activity[] }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14 }}>
           <StatTile icon={Boxes} label={`Tổng hạng mục năm ${ky.year}`} value={ytdNam.total} tone={{ c: C.plum, bg: C.pinkSoft }}
             onClick={() => moChiTiet(`Toàn bộ hạng mục · năm ${ky.year}`, scopedNamActive)} />
-          <StatTile icon={CheckCircle2} label="Hoàn thành VMP" value={`${ytdNam.vmp.rate}%`}
-            sub={`${ytdNam.vmp.done}/${ytdNam.vmp.total} · quá hạn ${ytdNam.vmp.over}`} tone={{ c: C.mintText, bg: C.mintSoft }}
+          <StatTile icon={CheckCircle2} label="Hoàn thành VMP" value={`${vmpNam.rate}%`}
+            sub={[`${vmpNam.done}/${vmpNam.total} · quá hạn ${vmpNam.over}`, ghiChuPhieu(phieuNam)].filter(Boolean).join(" · ")}
+            tone={{ c: C.mintText, bg: C.mintSoft }}
             onClick={() => moChiTiet(`Hoàn thành VMP · năm ${ky.year}`, scopedNamActive, "vmp")} />
         </div>
 

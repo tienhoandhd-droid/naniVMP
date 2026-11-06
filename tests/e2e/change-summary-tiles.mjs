@@ -1,7 +1,9 @@
 /* E2E thẻ "Thay đổi / Sai lệch hoàn thành <năm>" ở Tổng quan và Tổng hợp báo cáo.
  * Kiểm: số đúng theo luật (Đã xong / tổng phiếu có hạn trong năm, bỏ Không áp dụng),
  * thẻ nằm đúng lưới trên màn rộng, điện thoại không cuộn ngang, bấm thẻ mở Dữ liệu nguồn,
- * và lỗi tải danh sách hiện lời báo thay vì số giả. */
+ * và lỗi tải danh sách hiện lời báo thay vì số giả.
+ * Bước 2 (06/11): % Hoàn thành VMP (vòng năm Tổng quan, thẻ Báo cáo) gộp phiếu CHƯA gắn đợt;
+ * phiếu đã gắn đợt không đếm trùng; lỗi tải phiếu thì giữ tỉ lệ VMP gốc và ghi "chưa gồm". */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -49,7 +51,14 @@ const RECORDS = [
   phieu({ deadline: `${YEAR - 1}-06-01`, handling_status: "cho_xu_ly" }), // năm khác: không tính
   phieu({ record_kind: "sai_lech", deadline: null }),
   phieu({ record_kind: "sai_lech", deadline: `${YEAR}-05-01`, handling_status: "khong_ap_dung" }),
+  // Đã gắn đợt thẩm định → có trong thẻ Sai lệch nhưng KHÔNG cộng thêm vào tỉ lệ VMP.
+  phieu({ record_kind: "sai_lech", deadline: `${YEAR}-03-01`, handling_status: "da_xong",
+    plan_items: [{ id: "00000000-0000-4000-8000-0000000000aa", validation_code: "TD-1", object_code: "TB-1",
+      validation_type: "Tái thẩm định", year: YEAR, computed_status: null, deadline_validation: null, linked: true }] }),
 ];
+/* Phiếu chưa gắn đợt có hạn trong năm: 3 phiếu thay đổi (1 đã xong). */
+const PHIEU_GOP = { total: 3, done: 1 };
+const tyLe = (done, total) => (total ? Math.round((done / total) * 100) : 0);
 const may = { fail: false };
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: ["--no-sandbox", ...CHROME_GL_ARGS] });
@@ -99,11 +108,25 @@ try {
   assert.match(td.text, /33%/);
   assert.match(td.text, /1\/3 đã xong · quá hạn 1/);
   assert.match(sl.text, new RegExp(`Sai lệch hoàn thành ${YEAR}`));
-  assert.match(sl.text, /—/);
-  assert.match(sl.text, /1 phiếu chưa có hạn/);
+  assert.match(sl.text, /100%/);
+  assert.match(sl.text, /1\/1 đã xong · 1 chưa có hạn/);
   assert.ok(td.y >= k1, "thẻ Thay đổi phải nằm dưới hàng chỉ số đầu");
   assert.equal(Math.round(td.y), Math.round(sl.y), "hai thẻ cùng một hàng");
   assert.ok(td.w > sl.w * 1.5, "thẻ Thay đổi chiếm 2/3 hàng, Sai lệch 1/3");
+
+  // 1b. Vòng năm: % = (VMP xong + phiếu xong) ÷ (VMP tổng + phiếu tổng).
+  const vong = () => page.evaluate(() => ({
+    rate: Number(document.querySelector(".vmp-vongnam-loi-tyle")?.textContent?.replace("%", "").trim()),
+    done: Number(document.querySelector('[data-overview-metric="completed"] [data-overview-value]')?.textContent),
+    total: Number(document.querySelector("[data-overview-total]")?.getAttribute("data-overview-total")),
+    note: document.querySelector("[data-overview-change-note]")?.textContent?.trim() ?? null,
+  }));
+  const v = await vong();
+  console.log("Vòng năm:", v);
+  assert.ok(v.total > 0, "giả lập phải có hạng mục VMP");
+  assert.equal(v.rate, tyLe(v.done + PHIEU_GOP.done, v.total + PHIEU_GOP.total), "vòng năm chưa gộp phiếu đúng luật");
+  assert.notEqual(v.rate, tyLe(v.done, v.total), "dữ liệu thử phải làm tỉ lệ gộp khác tỉ lệ gốc");
+  assert.equal(v.note, "Tỉ lệ gồm 3 phiếu thay đổi/sai lệch");
 
   // 2. Bấm thẻ → màn Dữ liệu nguồn (nơi có tab Thay đổi / Sai lệch).
   await page.click('[data-overview-kpi="change-thay_doi"]');
@@ -125,6 +148,19 @@ try {
   assert.match(rTd.text, /1\/3 đã xong · quá hạn 1/);
   const heading = await page.evaluate(() => document.body.innerText.includes("DỮ LIỆU BỔ SUNG — phiếu Thay đổi / Sai lệch"));
   assert.ok(heading, "thiếu nhãn hàng dữ liệu bổ sung");
+  // StatTile: hàng nhãn → ô số (anh kế tiếp) → dòng phụ.
+  const vmpTile = await page.evaluate(() => {
+    const o = (re) => {
+      const hang = [...document.querySelectorAll(".vmp-tile span")].find((el) => re.test(el.textContent.trim()))?.parentElement;
+      return { value: hang?.nextElementSibling?.textContent.trim(), sub: hang?.nextElementSibling?.nextElementSibling?.textContent.trim() };
+    };
+    return { vmp: o(/^Hoàn thành VMP$/), tongNam: o(/^Tổng hạng mục năm/) };
+  });
+  console.log("Báo cáo Hoàn thành VMP:", vmpTile);
+  const m = vmpTile.vmp.sub?.match(/^(\d+)\/(\d+) · quá hạn \d+ · gồm 3 phiếu thay đổi\/sai lệch$/);
+  assert.ok(m, "thẻ Hoàn thành VMP phải ghi 'gồm 3 phiếu thay đổi/sai lệch'");
+  assert.equal(Number(m[2]), Number(vmpTile.tongNam.value) + PHIEU_GOP.total, "tổng phải = hạng mục VMP + phiếu chưa gắn đợt");
+  assert.equal(vmpTile.vmp.value, `${tyLe(Number(m[1]), Number(m[2]))}%`);
 
   // 5. Lỗi tải: hiện lời báo, không hiện số giả.
   may.fail = true;
@@ -133,6 +169,10 @@ try {
   const err = await tile("thay_doi");
   console.log("Khi lỗi:", err.text);
   assert.doesNotMatch(err.text, /\d+%/);
+  await page.waitForFunction(() => document.querySelector("[data-overview-change-note]")?.textContent?.includes("chưa gồm"), { timeout: 15_000 });
+  const vErr = await vong();
+  console.log("Vòng năm khi lỗi:", vErr);
+  assert.equal(vErr.rate, tyLe(vErr.done, vErr.total), "lỗi tải phiếu thì giữ tỉ lệ VMP gốc");
 
   assert.deepEqual(chanNgoai, [], "không được gọi ra mạng ngoài");
   assert.deepEqual(browserErrors, []);
