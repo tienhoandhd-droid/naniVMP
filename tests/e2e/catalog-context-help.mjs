@@ -17,6 +17,7 @@ mkdirSync(shotDir, { recursive: true });
 
 const regions = [
   ["objects", "Đối tượng"],
+  ["summary", "Bảng tổng quát"],
   ["coverage", "Phạm vi xưởng"],
   ["products", "Sản phẩm GMP"],
   ["alerts", "Người nhận cảnh báo"],
@@ -73,7 +74,7 @@ try {
   await page.waitForSelector(".cw-bang--objects tbody tr", { timeout: 15_000 });
 
   assert.deepEqual(await page.$$eval("[data-cw-nav]", (nodes) => nodes.map((node) => node.getAttribute("data-cw-nav"))),
-    regions.map(([id]) => id), "an authorized manager must receive help for all nine Source regions");
+    regions.map(([id]) => id), "an authorized manager must receive help for every Source region");
 
   for (const [id, label] of regions) {
     await page.click(`[data-cw-nav="${id}"]`);
@@ -120,7 +121,7 @@ try {
   await reader.waitForSelector(".cw-bang--objects tbody tr", { timeout: 15_000 });
   // "changes" không phải dữ liệu quản trị: RPC lọc phiếu theo phạm vi, chỉ QA sửa.
   await reader.waitForSelector('[data-cw-nav="changes"]', { timeout: 15_000 });
-  assert.deepEqual(await reader.$$eval("[data-cw-nav]", (nodes) => nodes.map((node) => node.getAttribute("data-cw-nav"))), ["objects", "changes", "deviations"],
+  assert.deepEqual(await reader.$$eval("[data-cw-nav]", (nodes) => nodes.map((node) => node.getAttribute("data-cw-nav"))), ["objects", "summary", "changes", "deviations"],
     "object-only reader must not gain management regions");
   assert.equal(await reader.$("[data-cw-them], [data-cw-sua], [data-cw-export-count]"), null,
     "opening reader help must not grant any catalog mutation or export control");
