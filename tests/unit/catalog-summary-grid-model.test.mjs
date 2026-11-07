@@ -74,7 +74,8 @@ test("sortSummaryRows sắp theo cột, không đổi mảng gốc, ô trống l
 });
 
 test("summaryCounts đếm theo trạng thái tổng để hiện dải chip", () => {
-  assert.deepEqual(summaryCounts(buildSummaryRows(acts)), { total: 2, done: 1, over: 0, prog: 1, todo: 0, plan: 0 });
+  assert.deepEqual(summaryCounts(buildSummaryRows(acts)), { total: 2, done: 1, over: 0, prog: 1, todo: 0, plan: 0, thieuNgayVmp: 1 },
+    "HT-12 mẫu: Trạng thái VMP Hoàn thành mà chưa có ngày → 1 mục thiếu ngày");
 });
 
 test("summaryExportAoa xuất đúng thứ tự cột đang thấy, ngày dạng dd/mm/yyyy", () => {
@@ -105,4 +106,16 @@ test("summaryExportAoa chỉ xuất cột đang hiện", () => {
   assert.ok(aoa[0].includes("Mã thẩm định") && aoa[0].includes("Hạn VMP"));
   assert.equal(aoa[0].length, aoa[1].length);
   assert.equal(summaryExportAoa(hang).at(0).length, 18, "không ẩn gì thì đủ 18 cột như cũ");
+});
+
+test("thieuNgayVmp: Trạng thái VMP Hoàn thành mà chưa có ngày thực tế thì cảnh báo", () => {
+  const [a, b, c] = buildSummaryRows([
+    { ...acts[0], _raw: { ...acts[0]._raw, tt_vmp: "completed", ngay_vmp: null } },
+    { ...acts[1], _raw: { ...acts[1]._raw, tt_vmp: "completed", ngay_vmp: "2026-03-31" } },
+    { ...acts[0], id: "X/2026.01-OQ", _raw: { ...acts[0]._raw, tt_vmp: "in_progress", ngay_vmp: null } },
+  ]);
+  assert.equal(a.thieuNgayVmp, true);
+  assert.equal(b.thieuNgayVmp, false, "có ngày thì không cảnh báo");
+  assert.equal(c.thieuNgayVmp, false, "chưa Hoàn thành thì chưa cần ngày");
+  assert.equal(summaryCounts([a, b, c]).thieuNgayVmp, 1);
 });

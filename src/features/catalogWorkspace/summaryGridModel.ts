@@ -38,6 +38,8 @@ export interface SummaryRow {
   status: string;
   statusLabel: string;
   daysLeft: number | null;
+  /** Trạng thái VMP = Hoàn thành nhưng chưa có ngày thực tế VMP (cần nhập bổ sung). */
+  thieuNgayVmp: boolean;
   /** Hạng mục gốc — truyền nguyên cho ProgressEditModal khi bấm Sửa. */
   act: Activity;
 }
@@ -92,6 +94,7 @@ export function buildSummaryRows(acts: readonly Activity[]): SummaryRow[] {
       status,
       statusLabel: STATUS[status as keyof typeof STATUS]?.label ?? status,
       daysLeft: typeof act.daysLeft === "number" ? act.daysLeft : null,
+      thieuNgayVmp: chu(raw.tt_vmp) === "completed" && !chu(raw.ngay_vmp),
       act,
     };
   });
@@ -142,9 +145,10 @@ export function sortSummaryRows(
 }
 
 export function summaryCounts(rows: readonly SummaryRow[]) {
-  const dem = { total: rows.length, done: 0, over: 0, prog: 0, todo: 0, plan: 0 };
+  const dem = { total: rows.length, done: 0, over: 0, prog: 0, todo: 0, plan: 0, thieuNgayVmp: 0 };
   for (const row of rows) {
-    if (row.status in dem && row.status !== "total") dem[row.status as "done"] += 1;
+    if (["done", "over", "prog", "todo", "plan"].includes(row.status)) dem[row.status as "done"] += 1;
+    if (row.thieuNgayVmp) dem.thieuNgayVmp += 1;
   }
   return dem;
 }

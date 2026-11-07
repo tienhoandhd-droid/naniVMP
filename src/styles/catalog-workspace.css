@@ -1296,3 +1296,7 @@ span.tdd-qua-han { font-size: 11px; font-weight: 800; }
 .cw-tq-cot__muc { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--lp-ink); cursor: pointer; }
 .cw-tq-cot__muc input:disabled + * , .cw-tq-cot__muc:has(input:disabled) { color: var(--lp-ink-muted); cursor: default; }
 .cw-tq__hanh-dong { display: inline-flex; gap: 6px; }
+.cw-tq-chip--nut { border: 0; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 700; }
+.cw-tq-chip--nut.is-chon { outline: 2px solid var(--lp-danger); outline-offset: 1px; }
+.cw-tq-chip--nut:focus-visible { outline: 2px solid var(--lp-focus); outline-offset: 1px; }
+.cw-tq__bang td .cw-tq-chip + .cw-tq-chip { margin-left: 4px; }

@@ -98,7 +98,13 @@ function veO(r: SummaryRow, key: SummarySortKey) {
     case "validation": return <OGiaiDoan g={r.validation} />;
     case "report": return <OGiaiDoan g={r.report} />;
     case "deadlineVmp": return ngayVn(r.deadlineVmp);
-    case "status": return <span className={`cw-tq-chip is-${r.status}`}>{r.statusLabel}</span>;
+    case "status": return (
+      <>
+        <span className={`cw-tq-chip is-${r.status}`}>{r.statusLabel}</span>
+        {r.thieuNgayVmp && <span className="cw-tq-chip is-over" data-cw-summary-missing-vmp-date
+          title="Trạng thái VMP Hoàn thành nhưng chưa có ngày thực tế — bấm Tiến độ để nhập">Thiếu ngày VMP</span>}
+      </>
+    );
     default: return r.validationCode;
   }
 }
@@ -112,6 +118,7 @@ export default function SummaryGrid({
   const [sapXep, setSapXep] = useState<{ key: SummarySortKey; dir: "asc" | "desc" }>({ key: "deadlineVmp", dir: "asc" });
   const [edit, setEdit] = useState<Activity | null>(null);
   const [dangXuat, setDangXuat] = useState(false);
+  const [chiThieuNgay, setChiThieuNgay] = useState(false);
   const [anCot, setAnCot] = useState<Set<SummarySortKey>>(docCotAn);
   useEffect(() => { ghiCotAn(anCot); }, [anCot]);
   const cotHien = useMemo(() => SUMMARY_COLUMNS.filter((c) => !anCot.has(c.key)), [anCot]);
@@ -124,10 +131,13 @@ export default function SummaryGrid({
 
   const tatCa = useMemo(() => buildSummaryRows(acts), [acts]);
   const dangThay = useMemo(
-    () => sortSummaryRows(filterSummaryRows(tatCa, q), sapXep.key, sapXep.dir),
-    [tatCa, q, sapXep],
+    () => sortSummaryRows(
+      filterSummaryRows(chiThieuNgay ? tatCa.filter((r) => r.thieuNgayVmp) : tatCa, q),
+      sapXep.key, sapXep.dir),
+    [tatCa, q, sapXep, chiThieuNgay],
   );
   const dem = useMemo(() => summaryCounts(dangThay), [dangThay]);
+  const soThieuNgay = useMemo(() => tatCa.filter((r) => r.thieuNgayVmp).length, [tatCa]);
 
   const bamCot = (key: SummarySortKey) => setSapXep((cu) => (
     cu.key === key ? { key, dir: cu.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
@@ -202,6 +212,13 @@ export default function SummaryGrid({
         {CHIP.filter((c) => dem[c.id] > 0).map((c) => (
           <span key={c.id} className={`cw-tq-chip is-${c.id}`}>{c.ten} {dem[c.id]}</span>
         ))}
+      {soThieuNgay > 0 && (
+          <button type="button" className={`cw-tq-chip is-over cw-tq-chip--nut${chiThieuNgay ? " is-chon" : ""}`}
+            aria-pressed={chiThieuNgay} data-cw-summary-missing-filter={soThieuNgay}
+            onClick={() => setChiThieuNgay((cu) => !cu)}>
+            ⚠ Thiếu ngày VMP {soThieuNgay}{chiThieuNgay ? " · bỏ lọc" : ""}
+          </button>
+        )}
       </p>
 
       <div className="cw-tq__cuon">

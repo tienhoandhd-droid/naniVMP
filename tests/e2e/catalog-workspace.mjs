@@ -567,6 +567,9 @@ async function chuanBiApV1(trang) {
   kiem(tq.state === "ready" && tq.soDong > 0, "bảng tổng quát hiện hạng mục không cần lọc", `${tq.state} ${tq.soDong} dòng`);
   kiem(tq.dem === tq.soDong, "số đếm khớp số dòng", `${tq.dem}/${tq.soDong}`);
   kiem(tq.thDinh === "sticky", "tiêu đề bảng tổng quát dính khi cuộn", tq.thDinh);
+  /* Kho giả không có mục "Hoàn thành mà thiếu ngày VMP" → không được báo nhầm. */
+  kiem(!(await trang.$("[data-cw-summary-missing-vmp-date], [data-cw-summary-missing-filter]")),
+    "không báo nhầm Thiếu ngày VMP khi dữ liệu đủ ngày");
   kiem(tq.coSua, "người đủ quyền thấy nút Sửa trên từng dòng");
   kiem(tq.coXuat, "Admin thấy nút Xuất Excel của bảng tổng quát");
   /* Bấm tiêu đề "Mã thẩm định" hai lần → giảm dần → dòng đầu đổi. */
