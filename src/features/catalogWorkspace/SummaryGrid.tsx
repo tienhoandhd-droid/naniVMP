@@ -11,6 +11,7 @@
  *     chỉ hiện khi người xem có quyền sửa Danh mục.
  *  Lưu xong App tải lại dữ liệu nên bảng và các màn khác thấy giá trị mới.
  *  Hiện/ẩn cột: nhớ riêng trên máy người xem (localStorage).
+ *  Bấm ô đếm (Quá hạn, Thiếu ngày VMP…) để chỉ xem nhóm đó; bấm lại để bỏ.
  * ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Boxes, Columns3, Download, Pencil, Search } from "lucide-react";
@@ -20,9 +21,9 @@ import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import { progressValidationCode } from "../progress/editableProgressRights.ts";
 import type { Activity } from "../../types/domain.ts";
 import {
-  SUMMARY_COLUMNS, buildSummaryRows, chuanHoaCotAn, filterSummaryRows, ngayVn, sortSummaryRows,
-  summaryCounts, summaryExportAoa,
-  type SummaryRow, type SummarySortKey, type SummaryStage,
+  SUMMARY_COLUMNS, buildSummaryRows, chuanHoaCotAn, filterSummaryRows, locTheoNhom, ngayVn,
+  nhomLocHieuLuc, sortSummaryRows, summaryCounts, summaryExportAoa,
+  type SummaryGroup, type SummaryRow, type SummarySortKey, type SummaryStage,
 } from "./summaryGridModel.ts";
 
 type OnUpdate = (
@@ -97,6 +98,7 @@ function veO(r: SummaryRow, key: SummarySortKey) {
     case "protocol": return <OGiaiDoan g={r.protocol} />;
     case "validation": return <OGiaiDoan g={r.validation} />;
     case "report": return <OGiaiDoan g={r.report} />;
+    case "vmp": return <OGiaiDoan g={r.vmp} />;
     case "deadlineVmp": return ngayVn(r.deadlineVmp);
     case "status": return (
       <>
@@ -118,7 +120,7 @@ export default function SummaryGrid({
   const [sapXep, setSapXep] = useState<{ key: SummarySortKey; dir: "asc" | "desc" }>({ key: "deadlineVmp", dir: "asc" });
   const [edit, setEdit] = useState<Activity | null>(null);
   const [dangXuat, setDangXuat] = useState(false);
-  const [chiThieuNgay, setChiThieuNgay] = useState(false);
+  const [nhom, setNhom] = useState<SummaryGroup | null>(null);
   const [anCot, setAnCot] = useState<Set<SummarySortKey>>(docCotAn);
   useEffect(() => { ghiCotAn(anCot); }, [anCot]);
   const cotHien = useMemo(() => SUMMARY_COLUMNS.filter((c) => !anCot.has(c.key)), [anCot]);
@@ -130,14 +132,15 @@ export default function SummaryGrid({
   });
 
   const tatCa = useMemo(() => buildSummaryRows(acts), [acts]);
+  /* Ô đếm đếm theo kết quả tìm (chưa lọc nhóm) để các nhóm khác vẫn hiện số và bấm chuyển được. */
+  const theoTim = useMemo(() => filterSummaryRows(tatCa, q), [tatCa, q]);
+  const dem = useMemo(() => summaryCounts(theoTim), [theoTim]);
+  const nhomDangLoc = nhomLocHieuLuc(nhom, dem);
   const dangThay = useMemo(
-    () => sortSummaryRows(
-      filterSummaryRows(chiThieuNgay ? tatCa.filter((r) => r.thieuNgayVmp) : tatCa, q),
-      sapXep.key, sapXep.dir),
-    [tatCa, q, sapXep, chiThieuNgay],
+    () => sortSummaryRows(locTheoNhom(theoTim, nhomDangLoc), sapXep.key, sapXep.dir),
+    [theoTim, nhomDangLoc, sapXep],
   );
-  const dem = useMemo(() => summaryCounts(dangThay), [dangThay]);
-  const soThieuNgay = useMemo(() => tatCa.filter((r) => r.thieuNgayVmp).length, [tatCa]);
+  const bamNhom = (id: SummaryGroup) => setNhom(nhomDangLoc === id ? null : id);
 
   const bamCot = (key: SummarySortKey) => setSapXep((cu) => (
     cu.key === key ? { key, dir: cu.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
@@ -207,17 +210,24 @@ export default function SummaryGrid({
         )}
       </div>
 
-      <p className="cw-tq__dem" data-cw-summary-count={dem.total}>
-        <strong>{dem.total}</strong> hạng mục
+      <p className="cw-tq__dem" data-cw-summary-count={dangThay.length}>
+        <strong>{dangThay.length}</strong> hạng mục
         {CHIP.filter((c) => dem[c.id] > 0).map((c) => (
-          <span key={c.id} className={`cw-tq-chip is-${c.id}`}>{c.ten} {dem[c.id]}</span>
-        ))}
-      {soThieuNgay > 0 && (
-          <button type="button" className={`cw-tq-chip is-over cw-tq-chip--nut${chiThieuNgay ? " is-chon" : ""}`}
-            aria-pressed={chiThieuNgay} data-cw-summary-missing-filter={soThieuNgay}
-            onClick={() => setChiThieuNgay((cu) => !cu)}>
-            ⚠ Thiếu ngày VMP {soThieuNgay}{chiThieuNgay ? " · bỏ lọc" : ""}
+          <button key={c.id} type="button" data-cw-summary-group={c.id}
+            className={`cw-tq-chip is-${c.id} cw-tq-chip--nut${nhomDangLoc === c.id ? " is-chon" : ""}`}
+            aria-pressed={nhomDangLoc === c.id} onClick={() => bamNhom(c.id)}>
+            {c.ten} {dem[c.id]}
           </button>
+        ))}
+        {dem.thieuNgayVmp > 0 && (
+          <button type="button" data-cw-summary-missing-filter={dem.thieuNgayVmp}
+            className={`cw-tq-chip is-over cw-tq-chip--nut${nhomDangLoc === "thieuNgayVmp" ? " is-chon" : ""}`}
+            aria-pressed={nhomDangLoc === "thieuNgayVmp"} onClick={() => bamNhom("thieuNgayVmp")}>
+            ⚠ Thiếu ngày VMP {dem.thieuNgayVmp}
+          </button>
+        )}
+        {nhomDangLoc && (
+          <button type="button" className="cw-nut cw-nut--phu" onClick={() => setNhom(null)}>Bỏ lọc</button>
         )}
       </p>
 
@@ -245,7 +255,9 @@ export default function SummaryGrid({
           </thead>
           <tbody>
             {dangThay.length === 0 ? (
-              <tr><td colSpan={cotHien.length + 1} className="cw-trong">Không có hạng mục khớp “{q}”.</td></tr>
+              <tr><td colSpan={cotHien.length + 1} className="cw-trong">
+                {q.trim() ? `Không có hạng mục khớp “${q.trim()}”.` : "Không có hạng mục nào."}
+              </td></tr>
             ) : dangThay.map((r: SummaryRow) => (
               <tr key={r.validationCode} className={`is-${r.status}`} data-cw-summary-row={r.validationCode}>
                 {cotHien.map((c) => c.key === "validationCode"

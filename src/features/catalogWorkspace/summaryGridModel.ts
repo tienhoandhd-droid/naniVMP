@@ -33,6 +33,8 @@ export interface SummaryRow {
   protocol: SummaryStage;
   validation: SummaryStage;
   report: SummaryStage;
+  /** Giai đoạn VMP (tt_vmp + ngay_vmp) — ngày này quyết định tỉ lệ hoàn thành VMP. */
+  vmp: SummaryStage;
   deadlineVmp: string;
   /** Trạng thái tổng do server kết luận: plan | todo | prog | done | over. */
   status: string;
@@ -47,7 +49,7 @@ export interface SummaryRow {
 export type SummarySortKey =
   | "validationCode" | "objectName" | "type" | "department" | "area" | "line"
   | "frequency" | "owner" | "support" | "protocol" | "validation" | "report"
-  | "deadlineVmp" | "status";
+  | "vmp" | "deadlineVmp" | "status";
 
 const NHAN_GIAI_DOAN: Record<string, string> = {
   completed: "Hoàn thành",
@@ -90,6 +92,7 @@ export function buildSummaryRows(acts: readonly Activity[]): SummaryRow[] {
       protocol: giaiDoan(raw, "tt_de_cuong", "ngay_de_cuong"),
       validation: giaiDoan(raw, "tt_tham_dinh", "ngay_tham_dinh"),
       report: giaiDoan(raw, "tt_bao_cao", "ngay_bao_cao"),
+      vmp: giaiDoan(raw, "tt_vmp", "ngay_vmp"),
       deadlineVmp: chu(raw.dl_vmp || act.target).slice(0, 10),
       status,
       statusLabel: STATUS[status as keyof typeof STATUS]?.label ?? status,
@@ -121,6 +124,7 @@ function giaTriSapXep(row: SummaryRow, key: SummarySortKey): string | number {
     case "protocol": return row.protocol.date || row.protocol.label;
     case "validation": return row.validation.date || row.validation.label;
     case "report": return row.report.date || row.report.label;
+    case "vmp": return row.vmp.date || row.vmp.label;
     case "status": return row.statusLabel;
     default: return row[key];
   }
@@ -153,6 +157,23 @@ export function summaryCounts(rows: readonly SummaryRow[]) {
   return dem;
 }
 
+/** Nhóm lọc khi bấm ô đếm: một trạng thái tổng, hoặc "Thiếu ngày VMP". */
+export type SummaryGroup = "done" | "prog" | "over" | "todo" | "plan" | "thieuNgayVmp";
+
+export function locTheoNhom(rows: readonly SummaryRow[], nhom: SummaryGroup | null): SummaryRow[] {
+  if (!nhom) return [...rows];
+  if (nhom === "thieuNgayVmp") return rows.filter((r) => r.thieuNgayVmp);
+  return rows.filter((r) => r.status === nhom);
+}
+
+/** Nhóm đang chọn mà không còn mục nào (vd vừa nhập xong ngày VMP cuối cùng)
+ *  thì coi như bỏ lọc — nếu không bảng sẽ trống và ô đếm để tắt lọc cũng ẩn mất. */
+export function nhomLocHieuLuc(
+  nhom: SummaryGroup | null, dem: ReturnType<typeof summaryCounts>,
+): SummaryGroup | null {
+  return nhom && dem[nhom] > 0 ? nhom : null;
+}
+
 export function ngayVn(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
@@ -172,6 +193,7 @@ export const SUMMARY_COLUMNS: ReadonlyArray<{ key: SummarySortKey; ten: string; 
   { key: "protocol", ten: "Đề cương" },
   { key: "validation", ten: "Thẩm định" },
   { key: "report", ten: "Báo cáo" },
+  { key: "vmp", ten: "VMP" },
   { key: "deadlineVmp", ten: "Hạn VMP" },
   { key: "status", ten: "Tình trạng" },
 ];
@@ -205,6 +227,8 @@ const COT_XUAT: Array<[SummarySortKey, string, (r: SummaryRow) => string | numbe
   ["validation", "Ngày thẩm định", (r) => ngayVn(r.validation.date)],
   ["report", "Báo cáo", (r) => r.report.label],
   ["report", "Ngày báo cáo", (r) => ngayVn(r.report.date)],
+  ["vmp", "VMP", (r) => r.vmp.label],
+  ["vmp", "Ngày VMP", (r) => ngayVn(r.vmp.date)],
   ["deadlineVmp", "Hạn VMP", (r) => ngayVn(r.deadlineVmp)],
   ["status", "Tình trạng", (r) => r.statusLabel],
 ];

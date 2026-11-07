@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildSummaryRows, filterSummaryRows, sortSummaryRows, summaryCounts, summaryExportAoa,
+  locTheoNhom, nhomLocHieuLuc,
 } from "../../src/features/catalogWorkspace/summaryGridModel.ts";
 
 /* Hai hạng mục mẫu đúng hình dạng rpc_get_vmp_dashboard_v2 trả về. */
@@ -30,6 +31,16 @@ const acts = [
       tt_vmp: "completed", dl_vmp: "2026-03-31",
     },
   },
+  {
+    id: "HT-13/2026.01-PQ", code: "HT-13", obj: "HT-13", name: "Nitơ",
+    type: "PQ", vtype: "PQ", dept: "cd", owner: "Tào Tiến Hoàn", support: null,
+    freq: 6, st: "done", target: "2026-03-31", daysLeft: null, state: "active",
+    _raw: {
+      khu_vuc: "E2", tan_suat: 6, bo_phan: "Cơ điện",
+      tt_de_cuong: "completed", tt_tham_dinh: "completed", tt_bao_cao: "completed",
+      tt_vmp: "completed", ngay_vmp: "2026-03-28", dl_vmp: "2026-03-31",
+    },
+  },
 ];
 
 test("buildSummaryRows đọc đủ cột cơ bản và nhãn trạng thái tiếng Việt", () => {
@@ -50,19 +61,22 @@ test("buildSummaryRows đọc đủ cột cơ bản và nhãn trạng thái ti�
   assert.equal(b.owner, "", "dấu — của server nghĩa là chưa có QA, không hiện như tên người");
   assert.equal(b.support, "Tào Tiến Hoàn");
   assert.equal(a.act, acts[0], "giữ nguyên hạng mục gốc để mở đúng form sửa");
+  assert.deepEqual(a.vmp, { label: "Đang làm", done: false, date: "" }, "cột VMP đọc tt_vmp/ngay_vmp");
+  assert.deepEqual(buildSummaryRows(acts)[2].vmp, { label: "Hoàn thành", done: true, date: "2026-03-28" });
 });
 
 test("filterSummaryRows tìm không phân biệt dấu trên mã, tên, QA, bộ phận", () => {
   const rows = buildSummaryRows(acts);
   assert.deepEqual(filterSummaryRows(rows, "").map((r) => r.validationCode), rows.map((r) => r.validationCode));
   assert.deepEqual(filterSummaryRows(rows, "khi nen").map((r) => r.objectCode), ["HT-12"]);
+  assert.deepEqual(filterSummaryRows(rows, "nito").map((r) => r.objectCode), ["HT-13"]);
   assert.deepEqual(filterSummaryRows(rows, "duc").map((r) => r.objectCode), ["PCTB201"]);
-  assert.deepEqual(filterSummaryRows(rows, "co dien").map((r) => r.objectCode), ["HT-12"]);
+  assert.deepEqual(filterSummaryRows(rows, "co dien").map((r) => r.objectCode), ["HT-12", "HT-13"]);
   assert.deepEqual(filterSummaryRows(rows, "pctb201/2026").map((r) => r.objectCode), ["PCTB201"]);
 });
 
 test("sortSummaryRows sắp theo cột, không đổi mảng gốc, ô trống luôn nằm cuối", () => {
-  const rows = buildSummaryRows(acts);
+  const rows = buildSummaryRows(acts.slice(0, 2));
   const truoc = rows.map((r) => r.validationCode);
   assert.deepEqual(sortSummaryRows(rows, "deadlineVmp", "asc").map((r) => r.objectCode), ["HT-12", "PCTB201"]);
   assert.deepEqual(sortSummaryRows(rows, "deadlineVmp", "desc").map((r) => r.objectCode), ["PCTB201", "HT-12"]);
@@ -74,7 +88,7 @@ test("sortSummaryRows sắp theo cột, không đổi mảng gốc, ô trống l
 });
 
 test("summaryCounts đếm theo trạng thái tổng để hiện dải chip", () => {
-  assert.deepEqual(summaryCounts(buildSummaryRows(acts)), { total: 2, done: 1, over: 0, prog: 1, todo: 0, plan: 0, thieuNgayVmp: 1 },
+  assert.deepEqual(summaryCounts(buildSummaryRows(acts.slice(0, 2))), { total: 2, done: 1, over: 0, prog: 1, todo: 0, plan: 0, thieuNgayVmp: 1 },
     "HT-12 mẫu: Trạng thái VMP Hoàn thành mà chưa có ngày → 1 mục thiếu ngày");
 });
 
@@ -105,7 +119,12 @@ test("summaryExportAoa chỉ xuất cột đang hiện", () => {
   }
   assert.ok(aoa[0].includes("Mã thẩm định") && aoa[0].includes("Hạn VMP"));
   assert.equal(aoa[0].length, aoa[1].length);
-  assert.equal(summaryExportAoa(hang).at(0).length, 18, "không ẩn gì thì đủ 18 cột như cũ");
+  assert.equal(summaryExportAoa(hang).at(0).length, 20, "không ẩn gì thì đủ 20 cột (thêm VMP + Ngày VMP)");
+  const vmp = summaryExportAoa(buildSummaryRows(acts).slice(2));
+  const i = vmp[0].indexOf("Ngày VMP");
+  assert.ok(i > 0 && vmp[0][i - 1] === "VMP", "cột VMP đứng ngay trước Ngày VMP");
+  assert.equal(vmp[1][i], "28/03/2026");
+  assert.ok(!summaryExportAoa(hang, new Set(["vmp"]))[0].includes("Ngày VMP"), "ẩn cột VMP thì file cũng bỏ");
 });
 
 test("thieuNgayVmp: Trạng thái VMP Hoàn thành mà chưa có ngày thực tế thì cảnh báo", () => {
@@ -118,4 +137,25 @@ test("thieuNgayVmp: Trạng thái VMP Hoàn thành mà chưa có ngày thực t�
   assert.equal(b.thieuNgayVmp, false, "có ngày thì không cảnh báo");
   assert.equal(c.thieuNgayVmp, false, "chưa Hoàn thành thì chưa cần ngày");
   assert.equal(summaryCounts([a, b, c]).thieuNgayVmp, 1);
+});
+
+test("sortSummaryRows sắp được theo cột VMP (ngày trước, chưa có ngày xếp theo nhãn)", () => {
+  const rows = buildSummaryRows(acts);
+  assert.deepEqual(sortSummaryRows(rows, "vmp", "asc").map((r) => r.objectCode)[0], "HT-13");
+});
+
+test("locTheoNhom: bấm ô đếm thì chỉ còn nhóm đó; null thì giữ nguyên", () => {
+  const rows = buildSummaryRows(acts);
+  assert.deepEqual(locTheoNhom(rows, null).length, 3);
+  assert.deepEqual(locTheoNhom(rows, "done").map((r) => r.objectCode), ["HT-12", "HT-13"]);
+  assert.deepEqual(locTheoNhom(rows, "prog").map((r) => r.objectCode), ["PCTB201"]);
+  assert.deepEqual(locTheoNhom(rows, "thieuNgayVmp").map((r) => r.objectCode), ["HT-12"]);
+});
+
+test("nhomLocHieuLuc: nhóm đang lọc hết mục (vd nhập xong ngày VMP cuối) thì tự bỏ lọc, không để bảng trống", () => {
+  const dem = summaryCounts(buildSummaryRows(acts));
+  assert.equal(nhomLocHieuLuc("thieuNgayVmp", dem), "thieuNgayVmp");
+  assert.equal(nhomLocHieuLuc("over", dem), null, "không còn mục quá hạn → bỏ lọc");
+  assert.equal(nhomLocHieuLuc("thieuNgayVmp", { ...dem, thieuNgayVmp: 0 }), null);
+  assert.equal(nhomLocHieuLuc(null, dem), null);
 });

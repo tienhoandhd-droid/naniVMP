@@ -570,6 +570,29 @@ async function chuanBiApV1(trang) {
   /* Kho giả không có mục "Hoàn thành mà thiếu ngày VMP" → không được báo nhầm. */
   kiem(!(await trang.$("[data-cw-summary-missing-vmp-date], [data-cw-summary-missing-filter]")),
     "không báo nhầm Thiếu ngày VMP khi dữ liệu đủ ngày");
+  /* Bấm ô đếm → chỉ còn nhóm đó; bấm "Bỏ lọc" → đủ lại. */
+  const loc = await trang.evaluate(async () => {
+    const chip = document.querySelector("[data-cw-summary-group]");
+    const id = chip?.getAttribute("data-cw-summary-group") ?? "";
+    const so = Number((chip?.textContent ?? "").match(/\d+$/)?.[0] ?? -1);
+    chip?.click();
+    await new Promise((r) => setTimeout(r, 200));
+    const dong = [...document.querySelectorAll("[data-cw-summary-row]")];
+    const ketQua = {
+      id, so, soDong: dong.length,
+      dungNhom: dong.every((tr) => tr.classList.contains(`is-${id}`)),
+      bam: document.querySelector(`[data-cw-summary-group="${id}"]`)?.getAttribute("aria-pressed"),
+    };
+    [...document.querySelectorAll(".cw-tq__dem button")].find((b) => b.textContent === "Bỏ lọc")?.click();
+    await new Promise((r) => setTimeout(r, 200));
+    ketQua.sauBo = document.querySelectorAll("[data-cw-summary-row]").length;
+    return ketQua;
+  });
+  kiem(loc.id && loc.soDong === loc.so && loc.dungNhom && loc.bam === "true",
+    "bấm ô đếm chỉ còn đúng nhóm đó", `${loc.id} ${loc.soDong}/${loc.so}`);
+  kiem(loc.sauBo === tq.soDong, "Bỏ lọc hiện đủ lại các hạng mục", `${loc.sauBo}/${tq.soDong}`);
+  kiem(await trang.evaluate(() => [...document.querySelectorAll(".cw-tq__bang thead th")]
+    .some((th) => th.textContent.trim() === "VMP")), "bảng tổng quát có cột VMP");
   kiem(tq.coSua, "người đủ quyền thấy nút Sửa trên từng dòng");
   kiem(tq.coXuat, "Admin thấy nút Xuất Excel của bảng tổng quát");
   /* Bấm tiêu đề "Mã thẩm định" hai lần → giảm dần → dòng đầu đổi. */
