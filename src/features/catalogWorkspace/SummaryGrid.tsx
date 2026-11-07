@@ -4,19 +4,24 @@
  *  Mở ra là thấy MỌI hạng mục trong năm, không cần lọc. Tìm nhanh, bấm
  *  tiêu đề cột để sắp xếp, tiêu đề + cột mã luôn dính khi cuộn.
  *
- *  Sửa: nút "Sửa" mở đúng ProgressEditModal của màn Cập nhật tiến độ.
- *  Không truyền permissionMode → hộp tự hỏi server quyền từng ô
- *  (fetchTimelineFieldPermission), nên bảng này không mở lối ghi mới.
+ *  Sửa (07/11/2026 — ghi thẳng dữ liệu thật, mọi màn cùng đổi):
+ *   · "Tiến độ" mở ProgressEditModal của màn Cập nhật tiến độ. Không truyền
+ *     permissionMode → hộp tự hỏi server quyền từng ô.
+ *   · "Đối tượng" nhờ Shell mở form Danh mục (QA, tần suất, bộ phận…) —
+ *     chỉ hiện khi người xem có quyền sửa Danh mục.
+ *  Lưu xong App tải lại dữ liệu nên bảng và các màn khác thấy giá trị mới.
+ *  Hiện/ẩn cột: nhớ riêng trên máy người xem (localStorage).
  * ===================================================================== */
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Download, Pencil, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, Boxes, Columns3, Download, Pencil, Search } from "lucide-react";
 import ProgressEditModal from "../../components/dashboard/ProgressEditModal.tsx";
 import { useToast } from "../../components/ui/ToastProvider.tsx";
 import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
 import { progressValidationCode } from "../progress/editableProgressRights.ts";
 import type { Activity } from "../../types/domain.ts";
 import {
-  buildSummaryRows, filterSummaryRows, ngayVn, sortSummaryRows, summaryCounts, summaryExportAoa,
+  SUMMARY_COLUMNS, buildSummaryRows, chuanHoaCotAn, filterSummaryRows, ngayVn, sortSummaryRows,
+  summaryCounts, summaryExportAoa,
   type SummaryRow, type SummarySortKey, type SummaryStage,
 } from "./summaryGridModel.ts";
 
@@ -36,24 +41,30 @@ export interface SummaryGridProps {
   canAssignWorkshop?: boolean;
   /** Cùng luật với Xuất Excel ở tab Đối tượng: chỉ Admin/Quản lý QA. */
   canExport?: boolean;
+  /** Có hàm này (người xem được sửa Danh mục) thì mỗi dòng có nút "Đối tượng". */
+  onSuaDoiTuong?: (objectCode: string) => void;
 }
 
-const COT: Array<{ key: SummarySortKey; ten: string }> = [
-  { key: "validationCode", ten: "Mã thẩm định" },
-  { key: "objectName", ten: "Đối tượng" },
-  { key: "type", ten: "Loại" },
-  { key: "department", ten: "Bộ phận" },
-  { key: "area", ten: "Khu vực" },
-  { key: "line", ten: "Line" },
-  { key: "frequency", ten: "Tần suất" },
-  { key: "owner", ten: "QA phụ trách" },
-  { key: "support", ten: "QA hỗ trợ" },
-  { key: "protocol", ten: "Đề cương" },
-  { key: "validation", ten: "Thẩm định" },
-  { key: "report", ten: "Báo cáo" },
-  { key: "deadlineVmp", ten: "Hạn VMP" },
-  { key: "status", ten: "Tình trạng" },
-];
+const KHOA_NHO_COT = "vmp-bang-tong-quat-cot-an";
+
+/* Lựa chọn cột là tiện ích riêng từng máy: đọc/ghi hỏng (trình duyệt chặn)
+   thì vẫn hiện đủ cột, chỉ ghi cảnh báo — không chặn người dùng. */
+function docCotAn(): Set<SummarySortKey> {
+  try {
+    const raw = window.localStorage.getItem(KHOA_NHO_COT);
+    return chuanHoaCotAn(raw ? JSON.parse(raw) : null);
+  } catch (cause) {
+    console.warn("[Bảng tổng quát] Không đọc được lựa chọn cột đã nhớ:", cause);
+    return new Set();
+  }
+}
+function ghiCotAn(an: ReadonlySet<SummarySortKey>) {
+  try {
+    window.localStorage.setItem(KHOA_NHO_COT, JSON.stringify([...an]));
+  } catch (cause) {
+    console.warn("[Bảng tổng quát] Không nhớ được lựa chọn cột:", cause);
+  }
+}
 
 const CHIP: Array<{ id: "done" | "prog" | "over" | "todo" | "plan"; ten: string }> = [
   { id: "done", ten: "Hoàn thành" },
@@ -72,15 +83,44 @@ function OGiaiDoan({ g }: { g: SummaryStage }) {
   );
 }
 
+/** Nội dung một ô theo cột (Mã thẩm định vẽ riêng làm tiêu đề dòng). */
+function veO(r: SummaryRow, key: SummarySortKey) {
+  switch (key) {
+    case "objectName": return <><span className="cw-tq__ten">{r.objectName}</span><small>{r.objectCode}</small></>;
+    case "type": return r.type;
+    case "department": return r.department;
+    case "area": return r.area;
+    case "line": return r.line;
+    case "frequency": return r.frequency ?? "";
+    case "owner": return r.owner;
+    case "support": return r.support;
+    case "protocol": return <OGiaiDoan g={r.protocol} />;
+    case "validation": return <OGiaiDoan g={r.validation} />;
+    case "report": return <OGiaiDoan g={r.report} />;
+    case "deadlineVmp": return ngayVn(r.deadlineVmp);
+    case "status": return <span className={`cw-tq-chip is-${r.status}`}>{r.statusLabel}</span>;
+    default: return r.validationCode;
+  }
+}
+
 export default function SummaryGrid({
   acts, loadStatus, loadError, onUpdate, onReload,
-  canChonNguoiThucHien, canDoiTrangThai, canAssignWorkshop, canExport = false,
+  canChonNguoiThucHien, canDoiTrangThai, canAssignWorkshop, canExport = false, onSuaDoiTuong,
 }: SummaryGridProps) {
   const toast = useToast();
   const [q, setQ] = useState("");
   const [sapXep, setSapXep] = useState<{ key: SummarySortKey; dir: "asc" | "desc" }>({ key: "deadlineVmp", dir: "asc" });
   const [edit, setEdit] = useState<Activity | null>(null);
   const [dangXuat, setDangXuat] = useState(false);
+  const [anCot, setAnCot] = useState<Set<SummarySortKey>>(docCotAn);
+  useEffect(() => { ghiCotAn(anCot); }, [anCot]);
+  const cotHien = useMemo(() => SUMMARY_COLUMNS.filter((c) => !anCot.has(c.key)), [anCot]);
+  const hien = (key: SummarySortKey) => !anCot.has(key);
+  const doiCot = (key: SummarySortKey) => setAnCot((cu) => {
+    const moi = new Set(cu);
+    if (moi.has(key)) moi.delete(key); else moi.add(key);
+    return moi;
+  });
 
   const tatCa = useMemo(() => buildSummaryRows(acts), [acts]);
   const dangThay = useMemo(
@@ -98,7 +138,7 @@ export default function SummaryGrid({
     setDangXuat(true);
     const progress = toast.dangChay("Đang xuất Excel…");
     try {
-      await xuatExcelAoa([{ ten: "Bảng tổng quát", dong: summaryExportAoa(dangThay) }],
+      await xuatExcelAoa([{ ten: "Bảng tổng quát", dong: summaryExportAoa(dangThay, anCot) }],
         `VMP_Bang_tong_quat_${new Date().toISOString().slice(0, 10)}.xlsx`);
       progress.xong(`Đã xuất ${dangThay.length} hạng mục.`);
     } catch (cause) {
@@ -134,6 +174,22 @@ export default function SummaryGrid({
             placeholder="Tìm mã, tên, QA, bộ phận…" value={q}
             onChange={(e) => setQ(e.target.value)} />
         </div>
+        <details className="cw-tq-cot" data-cw-summary-columns>
+          <summary className="cw-nut">
+            <Columns3 size={15} aria-hidden="true" /> Cột{anCot.size > 0 ? ` (ẩn ${anCot.size})` : ""}
+          </summary>
+          <div className="cw-tq-cot__khung" role="group" aria-label="Chọn cột hiển thị">
+            {SUMMARY_COLUMNS.map((c) => (
+              <label key={c.key} className="cw-tq-cot__muc">
+                <input type="checkbox" checked={hien(c.key)} disabled={c.luonHien}
+                  onChange={() => doiCot(c.key)} data-cw-summary-col={c.key} />
+                {c.ten}
+              </label>
+            ))}
+            <button type="button" className="cw-nut cw-nut--phu" disabled={anCot.size === 0}
+              onClick={() => setAnCot(new Set())}>Hiện tất cả</button>
+          </div>
+        </details>
         {canExport && (
           <button type="button" className="cw-nut" onClick={xuat} disabled={dangXuat} aria-busy={dangXuat}>
             <Download size={15} aria-hidden="true" /> {dangXuat ? "Đang xuất…" : "Xuất Excel"}
@@ -153,7 +209,7 @@ export default function SummaryGrid({
           <caption className="lp-visually-hidden">Bảng tổng quát hạng mục thẩm định</caption>
           <thead>
             <tr>
-              {COT.map((c) => {
+              {cotHien.map((c) => {
                 const dang = sapXep.key === c.key;
                 return (
                   <th key={c.key} scope="col"
@@ -172,30 +228,29 @@ export default function SummaryGrid({
           </thead>
           <tbody>
             {dangThay.length === 0 ? (
-              <tr><td colSpan={COT.length + 1} className="cw-trong">Không có hạng mục khớp “{q}”.</td></tr>
+              <tr><td colSpan={cotHien.length + 1} className="cw-trong">Không có hạng mục khớp “{q}”.</td></tr>
             ) : dangThay.map((r: SummaryRow) => (
               <tr key={r.validationCode} className={`is-${r.status}`} data-cw-summary-row={r.validationCode}>
-                <th scope="row" className="cw-tq__ma">{r.validationCode}</th>
-                <td><span className="cw-tq__ten">{r.objectName}</span><small>{r.objectCode}</small></td>
-                <td>{r.type}</td>
-                <td>{r.department}</td>
-                <td>{r.area}</td>
-                <td>{r.line}</td>
-                <td className="cw-tq__so">{r.frequency ?? ""}</td>
-                <td>{r.owner}</td>
-                <td>{r.support}</td>
-                <td><OGiaiDoan g={r.protocol} /></td>
-                <td><OGiaiDoan g={r.validation} /></td>
-                <td><OGiaiDoan g={r.report} /></td>
-                <td className="cw-tq__so">{ngayVn(r.deadlineVmp)}</td>
-                <td><span className={`cw-tq-chip is-${r.status}`}>{r.statusLabel}</span></td>
+                {cotHien.map((c) => c.key === "validationCode"
+                  ? <th key={c.key} scope="row" className="cw-tq__ma">{r.validationCode}</th>
+                  : <td key={c.key} className={c.key === "frequency" || c.key === "deadlineVmp" ? "cw-tq__so" : undefined}>
+                      {veO(r, c.key)}
+                    </td>)}
                 <td>
-                  {onUpdate && (
-                    <button type="button" className="cw-nut cw-nut--phu" aria-label={`Sửa ${r.validationCode}`}
-                      onClick={() => setEdit(r.act)}>
-                      <Pencil size={14} aria-hidden="true" /> Sửa
-                    </button>
-                  )}
+                  <span className="cw-tq__hanh-dong">
+                    {onUpdate && (
+                      <button type="button" className="cw-nut cw-nut--phu" aria-label={`Sửa tiến độ ${r.validationCode}`}
+                        onClick={() => setEdit(r.act)}>
+                        <Pencil size={14} aria-hidden="true" /> Tiến độ
+                      </button>
+                    )}
+                    {onSuaDoiTuong && r.objectCode && (
+                      <button type="button" className="cw-nut cw-nut--phu" aria-label={`Sửa đối tượng ${r.objectCode}`}
+                        data-cw-summary-object={r.objectCode} onClick={() => onSuaDoiTuong(r.objectCode)}>
+                        <Boxes size={14} aria-hidden="true" /> Đối tượng
+                      </button>
+                    )}
+                  </span>
                 </td>
               </tr>
             ))}

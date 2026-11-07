@@ -554,6 +554,20 @@ export default function CatalogWorkspaceShell({
     }
   };
 
+  /* Bảng tổng quát → nút "Đối tượng": tìm đúng mã ở mọi loại rồi mở cùng
+     form Danh mục như tab Đối tượng (lưu có lý do, khoá phiên bản, tải lại). */
+  const suaDoiTuongTuBang = async (ma: string) => {
+    if (!sourceControls.canChange) return;
+    const dang = toast.dangChay(`Đang mở ${ma}…`);
+    const kq = await listSourceObjectPage({ objectKind: null, search: ma, filters: {}, cursor: null, limit: 25 });
+    if (!kq.ok) { dang.hong(kq.error); return; }
+    const row = kq.rows.find((r) => r.object_code === ma);
+    if (!row) { dang.hong(`Không thấy ${ma} trong Danh mục.`); return; }
+    dang.xong(`Đã mở ${ma}`);
+    if (SOURCE_KINDS.includes(row.object_kind as ObjectKind)) setKind(row.object_kind as ObjectKind);
+    setDangSuaObj({ row: row as unknown as Record<string, unknown>, taoMoi: false });
+  };
+
   /* Xuất đúng phần đang lọc của bảng đối tượng — tiện tra cứu, chỉ đọc. */
   const xuatExcel = async () => {
     if (!sourceControls.canExport || !hasAuthorizationRevision || vmpDateError || dangXuat) return;
@@ -901,7 +915,8 @@ export default function CatalogWorkspaceShell({
               canChonNguoiThucHien={summary?.canChonNguoiThucHien}
               canDoiTrangThai={summary?.canDoiTrangThai}
               canAssignWorkshop={summary?.canAssignWorkshop}
-              canExport={sourceControls.canExport} />
+              canExport={sourceControls.canExport}
+              onSuaDoiTuong={sourceControls.canChange ? suaDoiTuongTuBang : undefined} />
           )}
 
           {/* ----- Kỳ tái thẩm định từ ngày hoàn thành thực tế ----- */}

@@ -86,3 +86,23 @@ test("summaryExportAoa xuất đúng thứ tự cột đang thấy, ngày dạng
   assert.ok(aoa[1].includes("30/09/2026"));
   assert.equal(aoa[0].length, aoa[1].length);
 });
+
+test("chuanHoaCotAn bỏ khoá lạ và không bao giờ ẩn Mã thẩm định", async () => {
+  const { chuanHoaCotAn, SUMMARY_COLUMNS } = await import("../../src/features/catalogWorkspace/summaryGridModel.ts");
+  assert.equal(SUMMARY_COLUMNS[0].key, "validationCode");
+  assert.deepEqual([...chuanHoaCotAn(["owner", "validationCode", "khong-co", 7, "area"])].sort(), ["area", "owner"]);
+  assert.deepEqual([...chuanHoaCotAn(null)], []);
+  assert.deepEqual([...chuanHoaCotAn("owner")], [], "dữ liệu nhớ hỏng thì coi như hiện tất cả");
+});
+
+test("summaryExportAoa chỉ xuất cột đang hiện", () => {
+  const hang = buildSummaryRows(acts).slice(0, 1);
+  const an = new Set(["owner", "support", "protocol", "objectName"]);
+  const aoa = summaryExportAoa(hang, an);
+  for (const ten of ["QA phụ trách", "QA hỗ trợ", "Đề cương", "Ngày đề cương", "Tên đối tượng", "Mã đối tượng"]) {
+    assert.ok(!aoa[0].includes(ten), `không xuất cột ẩn: ${ten}`);
+  }
+  assert.ok(aoa[0].includes("Mã thẩm định") && aoa[0].includes("Hạn VMP"));
+  assert.equal(aoa[0].length, aoa[1].length);
+  assert.equal(summaryExportAoa(hang).at(0).length, 18, "không ẩn gì thì đủ 18 cột như cũ");
+});

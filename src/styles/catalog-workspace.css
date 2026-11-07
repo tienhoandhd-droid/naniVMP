@@ -1288,3 +1288,11 @@ span.tdd-qua-han { font-size: 11px; font-weight: 800; }
 .cw-tq-chip.is-done { background: var(--lp-success-soft); color: var(--lp-success); }
 .cw-tq-chip.is-over { background: var(--lp-danger-soft); color: var(--lp-danger); }
 .cw-tq-chip.is-prog { background: var(--lp-warning-bg); color: var(--lp-warning); }
+/* Chọn cột (07/11): bảng thả xuống ngay dưới nút "Cột". */
+.cw-tq-cot { position: relative; }
+.cw-tq-cot > summary { list-style: none; cursor: pointer; }
+.cw-tq-cot > summary::-webkit-details-marker { display: none; }
+.cw-tq-cot__khung { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; min-width: 220px; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--lp-line); border-radius: 12px; background: var(--lp-surface); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.cw-tq-cot__muc { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--lp-ink); cursor: pointer; }
+.cw-tq-cot__muc input:disabled + * , .cw-tq-cot__muc:has(input:disabled) { color: var(--lp-ink-muted); cursor: default; }
+.cw-tq__hanh-dong { display: inline-flex; gap: 6px; }

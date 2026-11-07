@@ -154,27 +154,61 @@ export function ngayVn(iso: string): string {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
 }
 
-const COT_XUAT: Array<[string, (r: SummaryRow) => string | number]> = [
-  ["Mã thẩm định", (r) => r.validationCode],
-  ["Mã đối tượng", (r) => r.objectCode],
-  ["Tên đối tượng", (r) => r.objectName],
-  ["Loại", (r) => r.type],
-  ["Bộ phận", (r) => r.department],
-  ["Khu vực", (r) => r.area],
-  ["Line", (r) => r.line],
-  ["Tần suất (tháng)", (r) => r.frequency ?? ""],
-  ["QA phụ trách", (r) => r.owner],
-  ["QA hỗ trợ", (r) => r.support],
-  ["Đề cương", (r) => r.protocol.label],
-  ["Ngày đề cương", (r) => ngayVn(r.protocol.date)],
-  ["Thẩm định", (r) => r.validation.label],
-  ["Ngày thẩm định", (r) => ngayVn(r.validation.date)],
-  ["Báo cáo", (r) => r.report.label],
-  ["Ngày báo cáo", (r) => ngayVn(r.report.date)],
-  ["Hạn VMP", (r) => ngayVn(r.deadlineVmp)],
-  ["Tình trạng", (r) => r.statusLabel],
+/** Cột của bảng, theo thứ tự hiển thị. Mã thẩm định luôn hiện (chỗ bám khi cuộn). */
+export const SUMMARY_COLUMNS: ReadonlyArray<{ key: SummarySortKey; ten: string; luonHien?: boolean }> = [
+  { key: "validationCode", ten: "Mã thẩm định", luonHien: true },
+  { key: "objectName", ten: "Đối tượng" },
+  { key: "type", ten: "Loại" },
+  { key: "department", ten: "Bộ phận" },
+  { key: "area", ten: "Khu vực" },
+  { key: "line", ten: "Line" },
+  { key: "frequency", ten: "Tần suất" },
+  { key: "owner", ten: "QA phụ trách" },
+  { key: "support", ten: "QA hỗ trợ" },
+  { key: "protocol", ten: "Đề cương" },
+  { key: "validation", ten: "Thẩm định" },
+  { key: "report", ten: "Báo cáo" },
+  { key: "deadlineVmp", ten: "Hạn VMP" },
+  { key: "status", ten: "Tình trạng" },
 ];
 
-export function summaryExportAoa(rows: readonly SummaryRow[]): Array<Array<string | number>> {
-  return [COT_XUAT.map(([ten]) => ten), ...rows.map((row) => COT_XUAT.map(([, lay]) => lay(row)))];
+const KHOA_CO_THE_AN: ReadonlySet<string> = new Set(
+  SUMMARY_COLUMNS.filter((c) => !c.luonHien).map((c) => c.key));
+
+/** Đọc danh sách cột ẩn đã nhớ: bỏ khoá lạ, không bao giờ ẩn Mã thẩm định.
+ *  Dữ liệu nhớ hỏng (không phải mảng) thì coi như hiện tất cả. */
+export function chuanHoaCotAn(value: unknown): Set<SummarySortKey> {
+  if (!Array.isArray(value)) return new Set();
+  return new Set(value.filter((k): k is SummarySortKey =>
+    typeof k === "string" && KHOA_CO_THE_AN.has(k)));
+}
+
+/* Mỗi cột Excel gắn với cột bảng (key) để ẩn trên bảng thì file cũng ẩn theo. */
+const COT_XUAT: Array<[SummarySortKey, string, (r: SummaryRow) => string | number]> = [
+  ["validationCode", "Mã thẩm định", (r) => r.validationCode],
+  ["objectName", "Mã đối tượng", (r) => r.objectCode],
+  ["objectName", "Tên đối tượng", (r) => r.objectName],
+  ["type", "Loại", (r) => r.type],
+  ["department", "Bộ phận", (r) => r.department],
+  ["area", "Khu vực", (r) => r.area],
+  ["line", "Line", (r) => r.line],
+  ["frequency", "Tần suất (tháng)", (r) => r.frequency ?? ""],
+  ["owner", "QA phụ trách", (r) => r.owner],
+  ["support", "QA hỗ trợ", (r) => r.support],
+  ["protocol", "Đề cương", (r) => r.protocol.label],
+  ["protocol", "Ngày đề cương", (r) => ngayVn(r.protocol.date)],
+  ["validation", "Thẩm định", (r) => r.validation.label],
+  ["validation", "Ngày thẩm định", (r) => ngayVn(r.validation.date)],
+  ["report", "Báo cáo", (r) => r.report.label],
+  ["report", "Ngày báo cáo", (r) => ngayVn(r.report.date)],
+  ["deadlineVmp", "Hạn VMP", (r) => ngayVn(r.deadlineVmp)],
+  ["status", "Tình trạng", (r) => r.statusLabel],
+];
+
+/** Xuất đúng các cột đang hiện trên bảng (người dùng chốt 07/11/2026). */
+export function summaryExportAoa(
+  rows: readonly SummaryRow[], anCot: ReadonlySet<SummarySortKey> = new Set(),
+): Array<Array<string | number>> {
+  const cot = COT_XUAT.filter(([key]) => !anCot.has(key));
+  return [cot.map(([, ten]) => ten), ...rows.map((row) => cot.map(([, , lay]) => lay(row)))];
 }

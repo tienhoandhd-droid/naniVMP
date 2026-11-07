@@ -593,6 +593,45 @@ async function chuanBiApV1(trang) {
   await trang.keyboard.press("Escape");
   await cho(300);
 
+  /* Hiện/ẩn cột: ẩn "QA phụ trách" → bớt một cột; tải lại vẫn nhớ; "Hiện tất cả" đủ lại. */
+  await trang.evaluate(() => { const o = document.querySelector('input[aria-label="Tìm trong bảng tổng quát"]'); if (o) o.value = ""; });
+  const soCotTruoc = await trang.$$eval(".cw-tq__bang thead th", (n) => n.length);
+  await trang.evaluate(() => {
+    document.querySelector("[data-cw-summary-columns] > summary")?.click();
+    document.querySelector('[data-cw-summary-col="owner"]')?.click();
+  });
+  await cho(300);
+  const sauAn = await trang.evaluate(() => ({
+    soCot: document.querySelectorAll(".cw-tq__bang thead th").length,
+    coQa: [...document.querySelectorAll(".cw-tq__bang thead th")].some((th) => th.textContent.includes("QA phụ trách")),
+    maKhoa: document.querySelector('[data-cw-summary-col="validationCode"]')?.disabled,
+  }));
+  kiem(sauAn.soCot === soCotTruoc - 1 && !sauAn.coQa, "ẩn được cột QA phụ trách", `${soCotTruoc}→${sauAn.soCot}`);
+  kiem(sauAn.maKhoa === true, "cột Mã thẩm định luôn hiện (không bỏ chọn được)");
+  await trang.reload({ waitUntil: "domcontentloaded" });
+  await cho(2400);
+  await trang.evaluate(() => document.querySelector('[data-cw-nav="summary"]')?.click());
+  await trang.waitForSelector("[data-cw-summary-state]", { timeout: 15_000 });
+  const sauTai = await trang.evaluate(() =>
+    [...document.querySelectorAll(".cw-tq__bang thead th")].some((th) => th.textContent.includes("QA phụ trách")));
+  kiem(!sauTai, "tải lại trang vẫn nhớ cột đã ẩn");
+  await trang.evaluate(() => {
+    document.querySelector("[data-cw-summary-columns] > summary")?.click();
+    [...document.querySelectorAll("[data-cw-summary-columns] button")].find((b) => b.textContent.includes("Hiện tất cả"))?.click();
+  });
+  await cho(300);
+  kiem(await trang.$$eval(".cw-tq__bang thead th", (n) => n.length) === soCotTruoc, "Hiện tất cả trả lại đủ cột");
+
+  /* Nút "Đối tượng" mở đúng form Danh mục của đối tượng trên dòng. */
+  const maDt = await trang.evaluate(() => document.querySelector("[data-cw-summary-object]")?.getAttribute("data-cw-summary-object") ?? "");
+  kiem(!!maDt, "người sửa được Danh mục thấy nút Đối tượng trên dòng");
+  await trang.evaluate(() => document.querySelector("[data-cw-summary-object]")?.click());
+  await trang.waitForSelector("#cof-object_code", { timeout: 10_000 }).catch(() => null);
+  const formDt = await trang.evaluate(() => document.querySelector("#cof-object_code")?.value ?? "");
+  kiem(formDt === maDt, "nút Đối tượng mở form Danh mục đúng mã", `${formDt} / ${maDt}`);
+  await trang.keyboard.press("Escape");
+  await cho(400);
+
   /* Chuyển sang Sản phẩm GMP — bảng riêng, cột riêng, dữ liệu server. */
   await trang.evaluate(() => document.querySelector('[data-cw-nav="products"]')?.click());
   await cho(1200);
@@ -640,6 +679,7 @@ async function chuanBiApV1(trang) {
     coXuat: [...document.querySelectorAll(".cw-tq__thanh button")].some((b) => b.textContent.includes("Xuất Excel")),
   }));
   kiem(!tqXuong.coXuat, "nhân viên xưởng không thấy Xuất Excel ở bảng tổng quát", tqXuong.state);
+  kiem(!(await trang.$("[data-cw-summary-object]")), "nhân viên xưởng không thấy nút sửa Đối tượng");
   await trang.evaluate(() => document.querySelector('[data-cw-nav="objects"]')?.click());
   await cho(600);
   kiem(!kq.coSua, "nhân viên xưởng không thấy nút Sửa");
