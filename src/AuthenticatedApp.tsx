@@ -1162,7 +1162,13 @@ function VerifiedAppShell({ user, logout, access }: {
                   authorizationRevision={authorizationRevision}
                   focus={moDanhMuc}
                   onFocusConsumed={() => setMoDanhMuc(null)}
-                  scopeLabel={nhanPhamVi} />
+                  scopeLabel={nhanPhamVi}
+                  summary={{
+                    acts, loadStatus: conn.status, loadError: conn.msg,
+                    onUpdate: updateActivity,
+                    canChonNguoiThucHien, canDoiTrangThai,
+                    canAssignWorkshop: access.can("progress", "assign_workshop_staff"),
+                  }} />
               )}
               {view === "health" && <HealthView acts={filteredActs} access={access} onRefresh={reloadData} refreshing={conn.status === "loading"} clientReady={conn.status === "ok"} year={currentBangkokYear} scopeFiltered={deptSel.length > 0 || areaSel.length > 0 || periodFilter !== "all"} />}
               {view === "rules" && <ActiveRulesView access={access} />}

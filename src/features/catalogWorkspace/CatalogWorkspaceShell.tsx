@@ -23,7 +23,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import "../../styles/catalog-workspace.css"; // B5: CSS theo route
 import {
   Bell, Boxes, CalendarClock, CalendarPlus, Check, Download, FileDiff, FileSpreadsheet, FileWarning, FlaskConical,
-  History, Hourglass, Plus, RefreshCw, Search,
+  History, Hourglass, Plus, RefreshCw, Search, Table2,
 } from "lucide-react";
 
 import CommandBar from "../../components/ui/CommandBar.tsx";
@@ -42,6 +42,7 @@ import {
 } from "../../lib/supabaseData.ts";
 import { useCatalogSuggestions } from "./useCatalogSuggestions.ts";
 import { xuatExcelAoa } from "../../lib/xuatExcel.ts";
+import SummaryGrid, { type SummaryGridProps } from "./SummaryGrid.tsx";
 import type { SourceWarnings } from "../../lib/supabaseData.ts";
 import type { AccessContext } from "../../lib/access.ts";
 import type { GenerateTimelineResult, ObjectKind, SourceObjectRow } from "../../types/domain.ts";
@@ -85,13 +86,14 @@ const NHAN_TRANG_THAI_CHO: Record<string, string> = {
 const DO_TRE_TIM_KIEM_MS = 250;
 
 /** Sáu mục của workspace — thứ tự này là hợp đồng, có bộ kiểm giữ. */
-type VungId = "objects" | "coverage" | "products" | "alerts" | "revalidation" | "changes" | "deviations" | "import" | "pending" | "history";
+type VungId = "objects" | "summary" | "coverage" | "products" | "alerts" | "revalidation" | "changes" | "deviations" | "import" | "pending" | "history";
 
 const CAC_VUNG: Array<{
   id: VungId; nhan: string; icon: typeof Boxes;
   canSua?: boolean; canSinhTimeline?: boolean; canAudit?: boolean;
 }> = [
   { id: "objects", nhan: "Đối tượng", icon: Boxes },
+  { id: "summary", nhan: "Bảng tổng quát", icon: Table2 },
   { id: "coverage", nhan: "Phạm vi xưởng", icon: Boxes },
   { id: "products", nhan: "Sản phẩm GMP", icon: FlaskConical },
   { id: "alerts", nhan: "Người nhận cảnh báo", icon: Bell },
@@ -114,12 +116,14 @@ export interface CatalogWorkspaceShellProps {
   onFocusConsumed?: () => void;
   /** Gọi khi timeline có thể đã đổi — App tải lại dashboard. */
   onReload?: () => void;
+  /** Bảng tổng quát: hạng mục App đã tải (server lọc theo quyền) + hàm lưu tiến độ. */
+  summary?: Omit<SummaryGridProps, "onReload" | "canExport">;
 }
 
 type TrangThaiTai = "loading" | "error" | "ready";
 
 export default function CatalogWorkspaceShell({
-  access, scopeLabel, authorizationRevision, focus, onFocusConsumed, onReload,
+  access, scopeLabel, authorizationRevision, focus, onFocusConsumed, onReload, summary,
 }: CatalogWorkspaceShellProps) {
   const canEdit = access.can("source", "edit_catalog");
   const canSinhTimeline = access.can("source", "generate_timeline");
@@ -888,6 +892,16 @@ export default function CatalogWorkspaceShell({
                 </>
               )}
             </>
+          )}
+
+          {/* ----- Bảng tổng quát: mọi hạng mục trong năm, không cần lọc ----- */}
+          {vung === "summary" && (
+            <SummaryGrid acts={summary?.acts ?? []} loadStatus={summary?.loadStatus}
+              loadError={summary?.loadError} onUpdate={summary?.onUpdate} onReload={onReload}
+              canChonNguoiThucHien={summary?.canChonNguoiThucHien}
+              canDoiTrangThai={summary?.canDoiTrangThai}
+              canAssignWorkshop={summary?.canAssignWorkshop}
+              canExport={sourceControls.canExport} />
           )}
 
           {/* ----- Kỳ tái thẩm định từ ngày hoàn thành thực tế ----- */}

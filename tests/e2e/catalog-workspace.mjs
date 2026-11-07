@@ -517,8 +517,8 @@ async function chuanBiApV1(trang) {
     };
   });
 
-  kiem(kq.thuTu === "objects,coverage,products,alerts,revalidation,changes,deviations,import,pending,history",
-    "mười mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
+  kiem(kq.thuTu === "objects,summary,coverage,products,alerts,revalidation,changes,deviations,import,pending,history",
+    "mười một mục nav đúng thứ tự", kq.thuTu || "(không thấy nav)");
   kiem(kq.coThem, "đủ quyền thấy nút Thêm");
   kiem(kq.coNhapExcel, "đủ quyền thấy mục Nhập Excel");
   kiem(!kq.coNguoiThucHien, "không còn chữ 'Người thực hiện' trên màn");
@@ -547,6 +547,51 @@ async function chuanBiApV1(trang) {
   kiem(chiTiet.chu.includes("Điểm trọng yếu") || chiTiet.chu.includes("trọng yếu"),
     "chi tiết có điểm trọng yếu");
   kiem(chiTiet.coSua, "chi tiết có hành động Sửa cho người đủ quyền");
+
+  /* Bảng tổng quát — mọi hạng mục, không cần lọc; Sửa mở hộp tiến độ có sẵn. */
+  await trang.evaluate(() => document.querySelector('[data-cw-nav="summary"]')?.click());
+  await trang.waitForSelector('[data-cw-summary-state]', { timeout: 15_000 });
+  const tq = await trang.evaluate(() => {
+    const dong = [...document.querySelectorAll("[data-cw-summary-row]")];
+    const th = document.querySelector(".cw-tq__bang thead th");
+    return {
+      state: document.querySelector("[data-cw-summary-state]")?.getAttribute("data-cw-summary-state"),
+      soDong: dong.length,
+      dem: Number(document.querySelector("[data-cw-summary-count]")?.getAttribute("data-cw-summary-count")),
+      thDinh: th ? getComputedStyle(th).position : "",
+      coSua: !!document.querySelector('.cw-tq__bang button[aria-label^="Sửa "]'),
+      coXuat: [...document.querySelectorAll(".cw-tq__thanh button")].some((b) => b.textContent.includes("Xuất Excel")),
+      maDau: dong[0]?.getAttribute("data-cw-summary-row") ?? "",
+    };
+  });
+  kiem(tq.state === "ready" && tq.soDong > 0, "bảng tổng quát hiện hạng mục không cần lọc", `${tq.state} ${tq.soDong} dòng`);
+  kiem(tq.dem === tq.soDong, "số đếm khớp số dòng", `${tq.dem}/${tq.soDong}`);
+  kiem(tq.thDinh === "sticky", "tiêu đề bảng tổng quát dính khi cuộn", tq.thDinh);
+  kiem(tq.coSua, "người đủ quyền thấy nút Sửa trên từng dòng");
+  kiem(tq.coXuat, "Admin thấy nút Xuất Excel của bảng tổng quát");
+  /* Bấm tiêu đề "Mã thẩm định" hai lần → giảm dần → dòng đầu đổi. */
+  await trang.evaluate(() => {
+    const nut = document.querySelector(".cw-tq__th");
+    nut?.click(); nut?.click();
+  });
+  await cho(200);
+  const sapXep = await trang.evaluate(() => ({
+    aria: document.querySelector(".cw-tq__bang thead th")?.getAttribute("aria-sort"),
+  }));
+  kiem(sapXep.aria === "descending", "bấm tiêu đề cột đổi chiều sắp xếp", sapXep.aria);
+  /* Tìm theo mã của dòng đầu tiên → còn đúng các dòng chứa mã đó. */
+  const tuKhoa = tq.maDau.split("/")[0];
+  await trang.type('input[aria-label="Tìm trong bảng tổng quát"]', tuKhoa);
+  await cho(300);
+  const sauTim = await trang.evaluate((k) => [...document.querySelectorAll("[data-cw-summary-row]")]
+    .every((tr) => tr.textContent.includes(k)), tuKhoa);
+  kiem(sauTim, "ô tìm lọc đúng dòng", tuKhoa);
+  await trang.evaluate(() => document.querySelector('.cw-tq__bang button[aria-label^="Sửa "]')?.click());
+  await cho(800);
+  const hop = await trang.evaluate(() => !!document.querySelector('[role="dialog"]'));
+  kiem(hop, "nút Sửa mở hộp cập nhật tiến độ");
+  await trang.keyboard.press("Escape");
+  await cho(300);
 
   /* Chuyển sang Sản phẩm GMP — bảng riêng, cột riêng, dữ liệu server. */
   await trang.evaluate(() => document.querySelector('[data-cw-nav="products"]')?.click());
@@ -585,9 +630,18 @@ async function chuanBiApV1(trang) {
   });
 
   // Tab Thay đổi mở cho mọi vai; RPC lọc phiếu theo phạm vi xưởng.
-  kiem(kq.muc === "objects,changes,deviations",
+  kiem(kq.muc === "objects,summary,changes,deviations",
     "nhân viên xưởng chỉ thấy đối tượng Source theo quyền", kq.muc || "(không thấy nav)");
   kiem(!kq.coThem, "nhân viên xưởng không thấy nút Thêm");
+  await trang.evaluate(() => document.querySelector('[data-cw-nav="summary"]')?.click());
+  await trang.waitForSelector("[data-cw-summary-state]", { timeout: 15_000 });
+  const tqXuong = await trang.evaluate(() => ({
+    state: document.querySelector("[data-cw-summary-state]")?.getAttribute("data-cw-summary-state"),
+    coXuat: [...document.querySelectorAll(".cw-tq__thanh button")].some((b) => b.textContent.includes("Xuất Excel")),
+  }));
+  kiem(!tqXuong.coXuat, "nhân viên xưởng không thấy Xuất Excel ở bảng tổng quát", tqXuong.state);
+  await trang.evaluate(() => document.querySelector('[data-cw-nav="objects"]')?.click());
+  await cho(600);
   kiem(!kq.coSua, "nhân viên xưởng không thấy nút Sửa");
   kiem(kq.soDong > 0, "nhân viên xưởng vẫn đọc được dữ liệu", `${kq.soDong} dòng`);
   await trang.close();

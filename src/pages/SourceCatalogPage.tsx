@@ -17,9 +17,10 @@
  * ===================================================================== */
 import CatalogWorkspaceShell from "../features/catalogWorkspace/CatalogWorkspaceShell.tsx";
 import type { AccessContext } from "../lib/access.ts";
+import type { SummaryGridProps } from "../features/catalogWorkspace/SummaryGrid.tsx";
 
 export default function SourceCatalogView({
-  access, scopeLabel, authorizationRevision, focus, onFocusConsumed, onReload,
+  access, scopeLabel, authorizationRevision, focus, onFocusConsumed, onReload, summary,
 }: {
   access: AccessContext;
   scopeLabel?: string;
@@ -28,6 +29,8 @@ export default function SourceCatalogView({
   focus?: { code: string; nhom?: string } | null;
   onFocusConsumed?: () => void;
   onReload?: () => void;
+  /** Dữ liệu cho tab Bảng tổng quát (hạng mục đã tải sẵn ở App). */
+  summary?: Omit<SummaryGridProps, "onReload" | "canExport">;
 }) {
   return (
     <CatalogWorkspaceShell
@@ -37,6 +40,7 @@ export default function SourceCatalogView({
       focus={focus}
       onFocusConsumed={onFocusConsumed}
       onReload={onReload}
+      summary={summary}
     />
   );
 }

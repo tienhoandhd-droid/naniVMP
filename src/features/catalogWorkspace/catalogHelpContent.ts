@@ -1,5 +1,5 @@
 export type CatalogHelpRegion =
-  | "objects" | "coverage" | "products" | "alerts"
+  | "objects" | "summary" | "coverage" | "products" | "alerts"
   | "revalidation" | "changes" | "deviations" | "import" | "pending" | "history";
 
 export interface CatalogHelpGuide {
@@ -22,6 +22,13 @@ export const CATALOG_HELP_CONTENT: Record<CatalogHelpRegion, CatalogHelpGuide> =
       "Đổi thẩm định, tần suất, tháng đầu hoặc năm cần lý do, rồi vào Chờ áp dụng.",
     ],
     caution: "Mã đối tượng không sửa được sau khi tạo.",
+  },
+  summary: {
+    title: "Bảng tổng quát", summary: "Mọi hạng mục trong năm trên một bảng, không cần lọc.",
+    steps: [
+      "Gõ vào ô tìm hoặc bấm tên cột để sắp xếp.",
+      "Bấm Sửa ở cuối dòng để cập nhật tiến độ.",
+    ],
   },
   coverage: {
     title: "Phạm vi xưởng", summary: "Giao bộ phận, khu vực cho nhân sự xưởng.",
@@ -105,7 +112,7 @@ export function canChangeCatalogHelpRegion(region: string, rights: {
   qaEditor?: boolean;
 }): boolean {
   if (region === "history") return false;
-  if (region === "changes" || region === "deviations") return rights.qaEditor === true;
+  if (region === "changes" || region === "deviations" || region === "summary") return rights.qaEditor === true;
   if (region === "coverage") return rights.canManageWorkshopScope;
   if (region === "revalidation") return rights.manager;
   if (region === "pending") return rights.manager && rights.canEdit && rights.canGenerateTimeline;
