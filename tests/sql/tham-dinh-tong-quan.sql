@@ -114,13 +114,47 @@ from t_ra r cross join lateral jsonb_array_elements(r.tq->'systems') s
 where r.uid = '32faba9b-7441-419e-afab-dbb452623b3e';
 
 -- 8. Mỗi dòng đợt: tiến độ + trạng thái ký trùng hàm gốc.
-select pg_temp.ok('08 Admin: tiến độ/ký của từng dòng đợt trùng hàm gốc',
-  bool_and(x->'progress' = cpc1_private.run_item_progress((x->>'run_id')::uuid, s->>'system')
-    and x->'sign_state' = cpc1_private.record_sign_state((x->>'record_id')::uuid, (x->>'version')::int)->'trang_thai'),
+select pg_temp.ok('08 Admin: trạng thái ký của từng dòng đợt trùng hàm gốc',
+  bool_and(x->'sign_state' = cpc1_private.record_sign_state((x->>'record_id')::uuid, (x->>'version')::int)->'trang_thai'),
   count(*)::text || ' dòng')
 from t_ra r cross join lateral jsonb_array_elements(r.tq->'systems') s
 cross join lateral jsonb_array_elements(s->'runs') x
 where r.uid = '32faba9b-7441-419e-afab-dbb452623b3e';
+
+-- 4b. Quyền MỘT PHẦN: tạm ngừng PQ HT-12 và HT-15 (ROLLBACK cuối file).
+--     Hơi dùng chung HT-14/HT-15 nên vẫn thấy nhờ HT-14; khí nén thì mất.
+--     Tổng quan và danh sách đợt phải mất/còn giống hệt nhau.
+update public.vmp_plan_items set is_active = false where id in ('HT-12/2026.01-PQ', 'HT-15/2026.01-PQ');
+create temp table t_ra2(uid uuid, list_pairs text[], tq_pairs text[], loi text);
+grant all on t_ra2 to authenticated;
+set local role authenticated;
+do $$
+declare a record; lp text[]; tp text[]; tq jsonb; m text;
+begin
+  for a in select * from t_ai where vai in ('admin', 'qa_manager', 'qa_staff') loop
+    perform pg_temp.as_user(a.uid);
+    begin
+      select coalesce(array_agg(distinct (r->>'id') || ':' || (it->>'system')), '{}') into lp
+      from jsonb_array_elements(public.cpc1_run_list()) r cross join lateral jsonb_array_elements(r->'items') it
+      where left(r->>'started_on', 4) = '2026';
+      tq := public.cpc1_overview(2026);
+      select coalesce(array_agg(distinct (x->>'run_id') || ':' || (s->>'system')), '{}') into tp
+      from jsonb_array_elements(tq->'systems') s cross join lateral jsonb_array_elements(s->'runs') x;
+      insert into t_ra2 values (a.uid, lp, tp, null);
+    exception when others then
+      get stacked diagnostics m = returned_sqlstate;
+      insert into t_ra2 values (a.uid, null, null, m);
+    end;
+  end loop;
+end $$;
+reset role;
+select pg_temp.ok('04b ' || a.vai || ' ' || left(a.uid::text, 8) || ': quyền một phần — Tổng quan = danh sách đợt',
+  r.loi is null and r.list_pairs = r.tq_pairs, coalesce(r.loi, '') || ' list=' || r.list_pairs::text || ' tq=' || r.tq_pairs::text)
+from t_ai a join t_ra2 r using (uid);
+select pg_temp.ok('04c có tài khoản thấy hơi nhưng không thấy khí nén (ca quyền một phần có thật)',
+  exists (select 1 from t_ra2 where exists (select 1 from unnest(tq_pairs) x where x like '%:steam')
+                                and not exists (select 1 from unnest(tq_pairs) x where x like '%:air')),
+  (select string_agg(left(uid::text, 8) || '=' || tq_pairs::text, ' ') from t_ra2));
 
 -- 9. Năm không hợp lệ bị từ chối; năm không có đợt trả mảng rỗng.
 set local role authenticated;

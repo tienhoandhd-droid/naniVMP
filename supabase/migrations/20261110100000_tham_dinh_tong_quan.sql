@@ -16,7 +16,6 @@ create function cpc1_private.run_item_progress(p_run uuid, p_system text)
 returns jsonb
 language plpgsql
 stable
-security definer
 set search_path = ''
 as $function$
 declare
