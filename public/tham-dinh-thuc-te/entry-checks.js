@@ -60,6 +60,8 @@
     if (spec.notDetected && /^(KPH|KFH)$/i.test(text)) return '';
     // Nội độc tố gel-clot ghi chữ như bản scan (quyết định 09/11): khớp cpc1_private.endotoxin_word.
     if (isEndotoxin(spec) && endotoxinWord(text)) return '';
+    // Chứng dương khí ghi "+" (có mọc) như bản scan = Đạt (quyết định 09/11): khớp cpc1_private.gas_row.
+    if (spec.key === 'positive_count' && text === '+') return '';
     if (spec.type === 'number') return checkNumber(text, spec);
     // Ô chữ có đơn vị đếm (vi sinh khí nén/nitơ CFU/m³): KPH/KFH hoặc số nguyên không âm — khớp máy chủ.
     if (spec.type === 'text' && kind(spec).count) return /^(KPH|KFH)$/i.test(text) ? '' : checkNumber(text, spec);

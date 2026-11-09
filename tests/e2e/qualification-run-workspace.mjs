@@ -234,6 +234,15 @@ try{
  assert.equal(await trend.locator('#trend-system-control').isHidden(),true,'dedicated trend route pins the system');
  assert.match(await trend.locator('#multi-trend-status').textContent(),/1 hồ sơ đã đóng/);
  assert.equal(await trend.locator('#multi-trend-data').getByText('Nitơ').count(),0,'air trend contains no cross-system data');
+ // K7 (09/11): 01:00 sáng giờ Việt Nam (= 18:00 UTC hôm trước) — ngày bắt đầu mặc định phải là hôm nay theo giờ VN.
+ const vnContext=await browser.newContext({viewport:{width:390,height:844},timezoneId:'Asia/Ho_Chi_Minh'});
+ try{
+  const early=await vnContext.newPage();await early.clock.setFixedTime(new Date('2026-11-09T18:00:00Z'));
+  await early.route('**/*',async route=>{const url=new URL(route.request().url());if(url.origin!=='http://qualification.test')return route.abort();if(url.pathname.endsWith('/cloud.js'))return route.fulfill({contentType:'text/javascript',body:fixture});if(url.pathname.endsWith('/runtime-config.js'))return route.fulfill({contentType:'text/javascript',body:'window.CPC1_SETTINGS={};'});try{return route.fulfill({body:await readFile(root+'/public'+url.pathname),contentType:url.pathname.endsWith('.js')?'text/javascript':url.pathname.endsWith('.css')?'text/css':url.pathname.endsWith('.html')?'text/html':'application/octet-stream'});}catch{return route.fulfill({status:404});}});
+  await early.goto('http://qualification.test/tham-dinh-thuc-te/runs.html');await early.locator('#run-started').waitFor({state:'attached'});
+  await early.waitForFunction(()=>document.getElementById('run-started').value!=='');
+  assert.equal(await early.locator('#run-started').inputValue(),'2026-11-10','start date uses Vietnam local day');
+ }finally{await vnContext.close();}
  assert.deepEqual(errors,[]);
  console.log('PASS mandatory selector + delayed-load lock; air and steam continuation; nitrogen BM05 scope; correction preview/Escape/retry/baseline; device-date sync; safe history; closed lock; requirements/editor authority; pinned closed-run trend; mobile width');
 }finally{await context.close();await browser.close();}

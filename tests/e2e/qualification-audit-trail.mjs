@@ -8,6 +8,8 @@ const rows = [
   { thoi_diem: '2026-10-16T02:30:00Z', loai: 'sua', he_thong: 'air', dot: 'Đợt tháng 10', ho_so: 'r1', phien_ban: 3, nguoi: 'QA Một', ly_do: 'Nhập nhầm đơn vị', thay_doi: [{ path: ['forms', 'bm01', 'P1', 'p05'], before: '12', after: '15' }], chi_tiet: null },
   { thoi_diem: '2026-10-16T03:00:00Z', loai: 'in', he_thong: 'air', dot: 'Đợt tháng 10', ho_so: 'r1', phien_ban: 3, nguoi: 'QA Một', ly_do: null, thay_doi: null, chi_tiet: 'BM01 · SHA-256 abcdef012345' },
   { thoi_diem: '2026-09-28T05:00:00Z', loai: 'dot', he_thong: 'steam', dot: 'Đợt tháng 9', ho_so: null, phien_ban: null, nguoi: 'Admin', ly_do: null, thay_doi: null, chi_tiet: 'history_imported' },
+  { thoi_diem: '2026-09-27T05:00:00Z', loai: 'ky', he_thong: 'steam', dot: 'Đợt tháng 9', ho_so: 'r2', phien_ban: 4, nguoi: 'QA Hai', ly_do: null, thay_doi: null, chi_tiet: 'duyet · DEV-01' },
+  { thoi_diem: '2026-09-27T04:00:00Z', loai: 'ky', he_thong: 'steam', dot: 'Đợt tháng 9', ho_so: 'r2', phien_ban: 4, nguoi: 'QA Hai', ly_do: 'Sai đơn vị', thay_doi: null, chi_tiet: 'mo_lai' },
 ];
 const fixture = `
 window.__calls=[];
@@ -41,12 +43,14 @@ async function mo(kichBan) {
 const page = await mo('du-lieu');
 await page.locator('#nk-bang tbody tr').first().waitFor();
 const bang = await page.locator('#nk-bang tbody tr').evaluateAll(trs => trs.map(tr => [...tr.cells].map(td => td.textContent)));
-assert.equal(bang.length, 3);
+assert.equal(bang.length, 5);
 assert.equal(bang[0][0], '16/10/2026 09:30', 'thời điểm dd/mm/yyyy HH:mm theo giờ VN (02:30Z = 09:30)');
 assert.deepEqual([bang[0][2], bang[0][6], bang[0][7]], ['Sửa số liệu', 'forms › bm01 › P1 › p05: 12 → 15', 'Nhập nhầm đơn vị']);
 assert.equal(bang[1][2], 'In PDF');
 assert.deepEqual([bang[2][2], bang[2][3], bang[2][6]], ['Sự kiện đợt', 'Hơi tinh khiết', 'Nhập dữ liệu lịch sử']);
-assert.match(await page.locator('#nk-trang-thai').textContent(), /^3 sự kiện/);
+assert.deepEqual([bang[3][2], bang[3][6]], ['Ký / mở lại', 'Ký duyệt · DEV-01'], 'ký duyệt hiện trong nhật ký');
+assert.deepEqual([bang[4][6], bang[4][7]], ['Mở lại hồ sơ', 'Sai đơn vị'], 'mở lại hiện kèm lý do');
+assert.match(await page.locator('#nk-trang-thai').textContent(), /^5 sự kiện/);
 await page.selectOption('#nk-he-thong', 'air');
 await page.fill('#nk-tu', '2026-10-01');
 await page.fill('#nk-den', '2026-10-16');

@@ -153,3 +153,11 @@ test('thông báo máy chủ không lộ đường dẫn kỹ thuật: tách “
  assert.deepEqual(result.cells,[{path:['forms','bm04','E1.R1-C1','microbial'],message:'Số đếm phải là số nguyên.'}]);
  assert.doesNotMatch(result.message,/›|forms/);
 });
+
+test('chứng dương khí ghi "+" (có mọc) như bản scan là hợp lệ; số CFU vẫn nguyên; chữ khác bị chặn',()=>{
+ const c=checks(),positive={type:'number',unit:'CFU',key:'positive_count',label:'Số CFU thu hồi — chứng dương'};
+ assert.equal(c.check('+',positive,{today}),'');assert.equal(c.check(' + ',positive,{today}),'');
+ assert.equal(c.check('80',positive,{today}),'');assert.match(c.check('80,5',positive,{today}),/nguyên/);
+ for(const value of ['++','-','Đạt'])assert.notEqual(c.check(value,positive,{today}),'',value);
+ assert.notEqual(c.check('+',{type:'number',unit:'CFU',key:'microbial'},{today}),'','chỉ ô chứng dương nhận "+"');
+});

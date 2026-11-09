@@ -3,8 +3,11 @@
   // Nhật ký thay đổi (gói 2, 16/10): đọc cpc1_audit_trail — Annex 11 §9.
   const $ = id => document.getElementById(id);
   const HE = { steam: 'Hơi tinh khiết', air: 'Khí nén', nitrogen: 'Khí nitơ' };
-  const LOAI = { luu: 'Lưu phiên bản', sua: 'Sửa số liệu', dot: 'Sự kiện đợt', in: 'In PDF' };
-  const DOT = { created: 'Tạo đợt', history_imported: 'Nhập dữ liệu lịch sử', closed: 'Kết thúc đợt', completed: 'Hoàn thành đợt', calibration_updated: 'Đổi hạn thiết bị', record_rescored: 'Chấm lại hồ sơ (giữ nguyên số liệu)' };
+  const LOAI = { luu: 'Lưu phiên bản', sua: 'Sửa số liệu', dot: 'Sự kiện đợt', in: 'In PDF', ky: 'Ký / mở lại' };
+  const KY = { kiem_tra: 'Ký kiểm tra', duyet: 'Ký duyệt', mo_lai: 'Mở lại hồ sơ' };
+  // Chi tiết chữ ký: "duyet · DEV-01" → "Ký duyệt · DEV-01".
+  const chuKy = text => { const [y, ...rest] = String(text || '').split(' · '); return [KY[y] || y, ...rest].join(' · '); };
+  const DOT = { created: 'Tạo đợt', history_imported: 'Nhập dữ liệu lịch sử', closed: 'Kết thúc đợt', completed: 'Hoàn thành đợt', calibration_updated: 'Đổi hạn thiết bị', record_scan_entry: 'Nhập theo bản scan (phiên bản mới)', record_rescored: 'Chấm lại hồ sơ (giữ nguyên số liệu)' };
   const LUU = { save_draft: 'Lưu', rescore: 'Chấm lại — số liệu không đổi' };
   let rows = [];
   // dd/mm/yyyy HH:mm theo giờ VN — tự ghép để không phụ thuộc thứ tự locale của trình duyệt.
@@ -14,7 +17,7 @@
   };
   const giaTri = v => v === null || v === undefined || v === '' ? '—' : String(v);
   const thayDoi = list => Array.isArray(list) ? list.map(c => `${(c.path || []).join(' › ')}: ${giaTri(c.before)} → ${giaTri(c.after)}`).join('; ') : '';
-  const chiTiet = r => r.loai === 'dot' ? (DOT[r.chi_tiet] || r.chi_tiet || '') : r.loai === 'luu' ? (LUU[r.chi_tiet] || r.chi_tiet || '') : r.loai === 'sua' ? thayDoi(r.thay_doi) : (r.chi_tiet || '');
+  const chiTiet = r => r.loai === 'dot' ? (DOT[r.chi_tiet] || r.chi_tiet || '') : r.loai === 'luu' ? (LUU[r.chi_tiet] || r.chi_tiet || '') : r.loai === 'sua' ? thayDoi(r.thay_doi) : r.loai === 'ky' ? chuKy(r.chi_tiet) : (r.chi_tiet || '');
   const cot = r => [thoiDiem(r.thoi_diem), r.nguoi || '', LOAI[r.loai] || r.loai, HE[r.he_thong] || '', r.dot || '', r.phien_ban ?? '', chiTiet(r), r.ly_do || ''];
 
   function hien() {
