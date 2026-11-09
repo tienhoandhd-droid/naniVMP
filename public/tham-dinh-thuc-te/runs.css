@@ -227,3 +227,31 @@ html[data-theme="dark"] .pq-point-card .pq-outside { fill: var(--pq-rule); }
 .ov-more summary{cursor:pointer;font-size:13px}
 @media(max-width:1023px){.ov-systems{grid-template-columns:1fr}}
 @media(max-width:640px){.ov-stats{grid-template-columns:1fr}}
+/* Bảng điểm lấy mẫu trong tab Tổng quan (09/11/2026). */
+.ov-open-grid{justify-self:start;min-height:36px;padding:6px 12px;font-size:13px}
+.ov-grid{margin-top:20px;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;min-width:0}
+.ov-grid-pick select{min-width:0}
+.ov-grid-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.ov-grid-head h3{margin:0;font-size:16px}
+.ov-grid-pick{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.ov-grid-pick select{width:auto;max-width:100%}
+.ov-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;padding:0;list-style:none;font-size:13px;color:var(--text-secondary)}
+.ov-legend li{display:flex;align-items:center;gap:6px}
+.ov-point-table{min-width:560px}
+.ov-point-table th[scope="row"]{font-weight:400;max-width:260px}
+.ov-point-table th[scope="row"] .help{display:block;margin-top:2px;font-size:12px}
+.ov-point-table td{text-align:center;vertical-align:middle}
+.ov-cell{min-width:44px;min-height:36px;padding:4px 8px;font-size:16px;font-weight:700;line-height:1}
+.ov-cell[aria-pressed="true"]{outline:3px solid var(--accent);outline-offset:1px}
+.ov-mark{display:inline-flex;align-items:center;gap:4px;font-weight:700}
+.st-pass{color:var(--success)}
+.st-fail{color:var(--danger)}
+.st-invalid{color:var(--warning)}
+.st-pending{color:var(--text-secondary)}
+.ov-point-detail{padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-card);background:var(--surface-subtle)}
+.ov-point-detail h4{margin:0 0 4px;font-size:15px}
+.ov-detail-group{margin-top:10px}
+.ov-detail-group dl{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:4px 16px;margin:6px 0 0;font-size:13px}
+.ov-detail-group dt{color:var(--text-secondary)}
+.ov-detail-group dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.ov-issues{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--danger)}

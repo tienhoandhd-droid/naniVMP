@@ -18,12 +18,26 @@ const data = { year: YEAR, systems: [
     runs: [{ run_id: 'run-11', title: 'Đợt tháng 11', started_on: `${YEAR}-11-03`, status: 'open', record_id: 'rec-n2-11', version: 1, progress: p(12, 12, 0, 1), sign_state: 'da_kiem_tra' }] },
   { system: 'steam', objects: ['HT-14', 'HT-15'], pq_items: [], runs: [] },
 ] };
+const airCfg = { forms: [
+  { id: 'bm01', title: 'Tiểu phân', fields: [{ key: 'p05', label: 'Tiểu phân ≥ 0,5 µm', unit: 'hạt/m³' }, { key: 'executed_by', label: 'Người thực hiện', unit: '' }], locations: [{ id: 'A1', name: 'Tank chứa khí nén' }, { id: 'A2', name: 'Phòng pha chế' }] },
+  { id: 'bm02', title: 'Vi sinh', fields: [{ key: 'cfu', label: 'Vi sinh', unit: 'CFU/m³' }], locations: [{ id: 'A1', name: 'Tank chứa khí nén' }, { id: 'A2', name: 'Phòng pha chế' }] }] };
+const snapshots = {
+  'rec-air-11': { id: 'rec-air-11', version: 2, data: { forms: { bm01: { A1: { p05: '330', executed_by: 'Hoàn' }, A2: { p05: '4100' } }, bm02: { A1: { cfu: 'KPH' } } } },
+    evaluation: { forms: { bm01: { rows: { A1: { status: 'pass', errors: {} }, A2: { status: 'fail', errors: {} } } }, bm02: { rows: { A1: { status: 'invalid', errors: { cfu: 'Nhập số thập phân hợp lệ.' } } } } }, source_context: { config: airCfg } } },
+  'rec-n2-11': { id: 'rec-n2-11', version: 1, data: { forms: { bm01: { N1: { p05: '12' } } } },
+    evaluation: { forms: { bm01: { rows: { N1: { status: 'pass', errors: {} } } } }, source_context: { config: { forms: [{ id: 'bm01', title: 'Tiểu phân', fields: [{ key: 'p05', label: 'Tiểu phân ≥ 0,5 µm', unit: 'hạt/m³' }], locations: [{ id: 'N1', name: 'Bồn nitơ' }] }] } } } },
+};
+const runList = [
+  { id: 'run-11', items: [{ system: 'air', record_id: 'rec-air-11', scope: { bm01: ['A1', 'A2'], bm02: ['A1', 'A2'] } }, { system: 'nitrogen', record_id: 'rec-n2-11', scope: { bm01: ['N1'] } }] },
+  { id: 'run-03', items: [{ system: 'air', record_id: 'rec-air-03', scope: { bm01: ['A1'] } }] },
+];
 const empty = { year: YEAR, systems: data.systems.map(s => ({ ...s, pq_items: [], runs: [] })) };
 
 const fixture = `
 window.__calls=[];
 window.CPC1Backend={getSession:async()=>({user:{id:'qa'}}),permissionsFor:()=>({can_view:false,can_view_current:false,can_enter:false}),
- listRuns:async()=>[],listHistory:async()=>[],
+ listRuns:async()=>${JSON.stringify(runList)},listHistory:async()=>[],
+ historySnapshot:async(id,version)=>{window.__snaps=(window.__snaps||0)+1;if(sessionStorage.getItem('kich-ban')==='loi-diem'&&window.__snaps===1)throw new Error('Không tải được hồ sơ.');const s=${JSON.stringify(snapshots)}[id];if(!s||s.version!==version)throw new Error('Không có hồ sơ '+id);return s;},
  overview:async year=>{window.__calls.push(year);const k=sessionStorage.getItem('kich-ban');
   if(k==='cham')await new Promise(r=>setTimeout(r,600));
   if(k==='loi'&&window.__calls.length===1)throw new Error('Mất kết nối máy chủ.');
@@ -82,6 +96,28 @@ try {
   assert.match(steam, /Hơi tinh khiết · HT-14 \/ HT-15/);
   assert.match(steam, new RegExp(`Chưa có đợt trong năm ${YEAR}`));
   assert.match(steam, new RegExp(`Không có PQ ${YEAR} trong phạm vi của bạn`));
+  // Bảng điểm: mặc định đợt gần nhất của hệ thống đầu tiên có đợt (khí nén).
+  await page.locator('.ov-point-table').waitFor();
+  assert.equal(await page.locator('#ov-grid-system').inputValue(), 'air');
+  assert.equal(await page.locator('#ov-grid-run').inputValue(), 'run-11');
+  assert.match((await text(page, '.ov-point-table caption')).replace(/\s+/g, ' '), /Đã có kết quả 2\/4 · Không đạt 1 · Cần kiểm tra 1 · Chưa có kết quả 1/);
+  assert.deepEqual(await page.locator('.ov-point-table thead th').allInnerTexts(), ['Điểm', 'BM01 · Tiểu phân', 'BM02 · Vi sinh']);
+  assert.deepEqual(await page.locator('.ov-point-table tbody tr').evaluateAll(rows => rows.map(r => [...r.querySelectorAll('td button')].map(b => b.textContent))), [['✓', '!'], ['✗', '—']]);
+  await page.getByRole('button', { name: 'A1 · BM02: Cần kiểm tra' }).click();
+  const chiTiet = (await text(page, '#ov-point-detail')).replace(/\s+/g, ' ');
+  assert.match(chiTiet, /A1 · Vi sinh/);
+  assert.match(chiTiet, /Vi sinh KPH CFU\/m³/, 'hiện số gốc đã nhập kèm đơn vị');
+  assert.match(chiTiet, /Vi sinh: Nhập số thập phân hợp lệ\./, 'hiện lý do cần kiểm tra');
+  await page.getByRole('button', { name: 'A1 · BM01: Đạt' }).click();
+  assert.match((await text(page, '#ov-point-detail')).replace(/\s+/g, ' '), /Tiểu phân ≥ 0,5 µm 330 hạt\/m³ Người thực hiện Hoàn/);
+  assert.equal(await page.getByRole('button', { name: 'A1 · BM01: Đạt' }).getAttribute('aria-pressed'), 'true');
+  // Đổi hệ thống → đợt gần nhất của nitơ.
+  await page.locator('#ov-grid-system').selectOption('nitrogen');
+  await page.locator('.ov-point-table caption', { hasText: 'Đã có kết quả 1/1' }).waitFor();
+  assert.equal(await page.locator('#ov-grid-run').inputValue(), 'run-11');
+  // Nút "Xem bảng điểm" trên thẻ khí nén đưa bảng về khí nén.
+  await page.locator('[data-overview-system="air"] .ov-open-grid').click();
+  await page.locator('.ov-point-table caption', { hasText: 'Đã có kết quả 2/4' }).waitFor();
   // Mở lại tab không gọi lại máy chủ; nút Tải lại thì gọi.
   await page.getByRole('tab', { name: 'Đợt thực hiện' }).click();
   await page.getByRole('tab', { name: 'Tổng quan' }).click();
@@ -116,12 +152,22 @@ try {
   await page.locator('[data-overview-system="air"]').waitFor();
   await page.close();
 
+  // 2b. Lỗi tải hồ sơ của bảng điểm → báo lỗi trong khung bảng, bấm Thử lại thì hiện bảng.
+  page = await mo('loi-diem');
+  await page.getByRole('tab', { name: 'Tổng quan' }).click();
+  await page.locator('#ov-grid [role="alert"]', { hasText: 'Không tải được hồ sơ.' }).waitFor();
+  assert.equal(await page.locator('[data-overview-system="air"]').count(), 1, 'lỗi bảng điểm không làm mất phần tổng');
+  await page.locator('#ov-grid').getByRole('button', { name: 'Thử lại' }).click();
+  await page.locator('.ov-point-table').waitFor();
+  await page.close();
+
   // 3. Rỗng → mỗi hệ thống báo chưa có đợt, số liệu = 0.
   page = await mo('rong');
   await page.getByRole('tab', { name: 'Tổng quan' }).click();
   await page.locator('[data-overview-system="steam"]').waitFor();
   assert.match((await text(page, '.ov-stats')).replace(/\s+/g, ' '), /Đợt đang mở 0 Hồ sơ đã duyệt 0\/0 Điểm không đạt 0/);
   assert.equal(await page.getByText(`Chưa có đợt trong năm ${YEAR}`).count(), 3);
+  assert.match(await text(page, '#ov-grid'), /Chưa có đợt để xem\./);
   await page.close();
 
   assert.deepEqual(errors, [], 'lỗi JavaScript trên trang');

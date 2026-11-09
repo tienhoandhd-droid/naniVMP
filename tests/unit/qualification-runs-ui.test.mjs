@@ -146,3 +146,57 @@ test('overview summary counts open runs once, approved records and failed points
 test('overview summary tolerates missing data', () => {
   assert.deepEqual(plain(ui.overviewSummary(null)), { openRuns: 0, records: 0, approved: 0, fail: 0, systems: [] });
 });
+
+const airSnapshot = {
+  data: { forms: { bm01: { A1: { p05: '330', p5: '2', executed_by: 'Hoàn', execution_date: '2026-03-05' } }, bm02: { A1: { oil: 'KPH' } } } },
+  evaluation: {
+    forms: { bm01: { rows: { A1: { status: 'pass', errors: {} }, A2: { status: 'fail', errors: {} } } }, bm02: { rows: { A1: { status: 'invalid', errors: { oil: 'Nhập số thập phân hợp lệ.' } }, A2: { status: 'incomplete' } } } },
+    source_context: { config: { forms: [
+      { id: 'bm01', title: 'Tiểu phân', fields: [{ key: 'p05', label: 'Tiểu phân ≥ 0,5 µm', unit: 'hạt/m³' }, { key: 'p5', label: 'Tiểu phân ≥ 5,0 µm', unit: 'hạt/m³' }, { key: 'executed_by', label: 'Người thực hiện', unit: '' }, { key: 'execution_date', label: 'Ngày thực hiện', type: 'date', unit: '' }], locations: [{ id: 'A1', name: 'Tank' }, { id: 'A2', name: 'Phòng B' }] },
+      { id: 'bm02', title: 'Dầu', fields: [{ key: 'oil', label: 'Hàm lượng dầu', unit: 'mg/m³' }], locations: [{ id: 'A1', name: 'Tank' }] }
+    ] } }
+  }
+};
+
+test('point grid: rows are scoped points, statuses come from the saved evaluation, missing scope cells stay empty', () => {
+  const grid = plain(ui.pointGrid('air', { bm01: ['A1', 'A2'], bm02: ['A1'] }, airSnapshot));
+  assert.deepEqual(grid.forms, [{ id: 'bm01', title: 'Tiểu phân' }, { id: 'bm02', title: 'Dầu' }]);
+  assert.deepEqual(grid.points.map(p => [p.id, p.point.name, p.cells]), [['A1', 'Tank', { bm01: 'pass', bm02: 'invalid' }], ['A2', 'Phòng B', { bm01: 'fail', bm02: null }]]);
+  assert.deepEqual(grid.counts, { pass: 1, fail: 1, invalid: 1, pending: 0, total: 3 });
+});
+
+test('point grid: steam reads locations status; unknown status counts as pending', () => {
+  const snap = { evaluation: { forms: { bm01: { locations: { S1: 'pass', S2: 'incomplete' } } }, source_context: { config: { locations: [{ id: 'S1', name: 'Máy phát' }] } } } };
+  const grid = plain(ui.pointGrid('steam', { bm01: ['S1', 'S2', 'S3'] }, snap));
+  assert.deepEqual(grid.points.map(p => p.cells.bm01), ['pass', 'pending', 'pending']);
+  assert.deepEqual(grid.counts, { pass: 1, fail: 0, invalid: 0, pending: 2, total: 3 });
+});
+
+test('point detail: gas shows original entered values with labels/units, dates dd/mm/yyyy, and reasons for invalid', () => {
+  const d = plain(ui.pointDetail('air', airSnapshot, 'bm01', 'A1'));
+  assert.equal(d.form, 'Tiểu phân');
+  assert.equal(d.status, 'pass');
+  assert.deepEqual(d.groups[0].rows, [
+    { label: 'Tiểu phân ≥ 0,5 µm', value: '330', unit: 'hạt/m³' }, { label: 'Tiểu phân ≥ 5,0 µm', value: '2', unit: 'hạt/m³' },
+    { label: 'Người thực hiện', value: 'Hoàn', unit: '' }, { label: 'Ngày thực hiện', value: '05/03/2026', unit: '' }]);
+  const bad = plain(ui.pointDetail('air', airSnapshot, 'bm02', 'A1'));
+  assert.equal(bad.status, 'invalid');
+  assert.deepEqual(bad.groups[0].issues, ['Hàm lượng dầu: Nhập số thập phân hợp lệ.']);
+  assert.deepEqual(plain(ui.pointDetail('air', airSnapshot, 'bm02', 'A2')).groups, [], 'chưa nhập thì không có nhóm số liệu');
+});
+
+test('point detail: steam lists each trial with the computed print result; a single-trial form is one group', () => {
+  const snap = {
+    data: { bm01: { S1: [{ vg: '2,1', vc: '145', date: '2026-03-10', executor: 'Phương' }, { vg: '2', vc: '150' }] }, bm02: { S1: { toc: '200' } } },
+    evaluation: { forms: { bm01: { locations: { S1: 'pass' }, rows: { S1: [{ errors: {}, values: { print_result: '1.47' } }, { errors: {}, values: { print_result: '1.35' } }] } }, bm02: { locations: { S1: 'pass' }, rows: { S1: { errors: {}, values: {} } } } },
+      source_context: { config: { forms: [{ id: 'bm01', title: 'Khí không ngưng tụ', fields: [{ key: 'vg', label: 'Vg', unit: 'mL' }, { key: 'vc', label: 'Vc', unit: 'mL' }] }, { id: 'bm02', title: 'Nước ngưng', fields: [{ key: 'toc', label: 'TOC', unit: 'ppb' }] }], locations: [{ id: 'S1', name: 'Máy phát' }] } } }
+  };
+  const d = plain(ui.pointDetail('steam', snap, 'bm01', 'S1'));
+  assert.deepEqual(d.groups.map(g => g.title), ['Lần 1', 'Lần 2']);
+  assert.deepEqual(d.groups[0].rows, [{ label: 'Vg', value: '2,1', unit: 'mL' }, { label: 'Vc', value: '145', unit: 'mL' }, { label: 'Ngày thực hiện', value: '10/03/2026', unit: '' }, { label: 'Người thực hiện', value: 'Phương', unit: '' }, { label: 'Kết quả tính', value: '1,47', unit: '' }]);
+  assert.deepEqual(plain(ui.pointDetail('steam', snap, 'bm02', 'S1')).groups, [{ title: '', rows: [{ label: 'TOC', value: '200', unit: 'ppb' }], issues: [] }]);
+  const withSelect = JSON.parse(JSON.stringify(snap));
+  withSelect.data.bm02.S1.appearance = 'pass';
+  withSelect.evaluation.source_context.config.forms[1].fields.unshift({ key: 'appearance', type: 'select', label: 'Cảm quan', options: [{ label: 'Trong, không màu, không mùi', value: 'pass' }] });
+  assert.deepEqual(plain(ui.pointDetail('steam', withSelect, 'bm02', 'S1')).groups[0].rows[0], { label: 'Cảm quan', value: 'Trong, không màu, không mùi', unit: '' }, 'trường chọn hiện nhãn, không hiện mã');
+});

@@ -72,7 +72,66 @@
       systems: systemRows
     };
   };
-  window.CPC1RunsUI = { campaignScope, validateSingleScope, validateCalibration, calibrationGroups, carriedExpiry, trendRoute, closedTrendHistory, trendSeries, overviewSummary };
+  // Bảng điểm lấy mẫu: hàng = điểm trong phạm vi đợt, cột = biểu mẫu. Trạng thái đọc từ kết quả
+  // chấm ĐÃ LƯU của hồ sơ (cùng chỗ run_progress đếm): hơi ở forms[f].locations[điểm], khí ở
+  // forms[f].rows[điểm].status. Không có trạng thái pass/fail/invalid → "Chưa có kết quả".
+  const POINT_STATUS = ['pass', 'fail', 'invalid'];
+  const pointStatus = (system, evaluation, form, point) => {
+    const raw = system === 'steam' ? evaluation?.forms?.[form]?.locations?.[point] : evaluation?.forms?.[form]?.rows?.[point]?.status;
+    return POINT_STATUS.includes(raw) ? raw : 'pending';
+  };
+  const snapshotConfig = snapshot => snapshot?.evaluation?.source_context?.config || {};
+  const snapshotPoint = (system, config, form, id) => (system === 'steam' ? config.locations : config.forms?.find(f => f.id === form)?.locations)?.find(p => p.id === id) || { id, name: id };
+  const pointGrid = (system, scope, snapshot) => {
+    const config = snapshotConfig(snapshot), evaluation = snapshot?.evaluation;
+    const forms = Object.keys(scope || {}).map(id => ({ id, title: config.forms?.find(f => f.id === id)?.title || id.toUpperCase() }));
+    const ids = [...new Set(forms.flatMap(f => scope[f.id] || []))];
+    const counts = { pass: 0, fail: 0, invalid: 0, pending: 0, total: 0 };
+    const points = ids.map(id => {
+      const cells = {};
+      forms.forEach(f => {
+        if (!(scope[f.id] || []).includes(id)) { cells[f.id] = null; return; }
+        const status = pointStatus(system, evaluation, f.id, id);
+        cells[f.id] = status; counts[status] += 1; counts.total += 1;
+      });
+      return { id, point: snapshotPoint(system, config, forms.find(f => (scope[f.id] || []).includes(id))?.id, id), cells };
+    });
+    return { forms, points, counts };
+  };
+  // Số GỐC đã nhập (payload), kèm nhãn/đơn vị từ cấu hình lưu theo hồ sơ. Hơi: mỗi lần đo một
+  // nhóm + kết quả tính đã làm tròn để in. Khí: một nhóm theo các trường của biểu mẫu.
+  const pointDetail = (system, snapshot, form, point) => {
+    const config = snapshotConfig(snapshot), formConfig = config.forms?.find(f => f.id === form) || {};
+    // Hơi lưu ngày/người ngoài danh sách trường của biểu mẫu.
+    const fields = [...(formConfig.fields || []), ...(system === 'steam' ? [{ key: 'date', label: 'Ngày thực hiện', type: 'date' }, { key: 'executor', label: 'Người thực hiện' }] : [])];
+    const labelOf = key => fields.find(f => f.key === key)?.label || key;
+    const present = v => v !== undefined && v !== null && v !== '';
+    const group = (title, values, computed) => {
+      const rows = fields.filter(field => present(values?.[field.key]))
+        .map(field => {
+          const raw = String(values[field.key]);
+          // Trường chọn (vd. Cảm quan) lưu mã "pass"/"fail": hiện nhãn của lựa chọn trong cấu hình.
+          const value = field.type === 'date' ? ngayVN(raw) : (field.options || []).find(o => o.value === raw)?.label || raw;
+          return { label: field.label || field.key, value, unit: field.unit || '' };
+        });
+      if (present(computed?.values?.print_result)) rows.push({ label: 'Kết quả tính', value: String(computed.values.print_result).replace('.', ','), unit: '' }); // chỉ hiển thị dấu phẩy thập phân như số nhập
+      const issues = Object.entries(computed?.errors || {}).map(([key, text]) => `${labelOf(key)}: ${text}`);
+      return { title, rows, issues };
+    };
+    const payload = snapshot?.data, computed = snapshot?.evaluation?.forms?.[form]?.rows?.[point];
+    let groups;
+    if (system === 'steam') {
+      const saved = payload?.[form]?.[point];
+      const trials = Array.isArray(saved) ? saved : saved && typeof saved === 'object' ? [saved] : [];
+      const results = Array.isArray(computed) ? computed : [computed];
+      groups = trials.map((trial, i) => group(trials.length > 1 ? `Lần ${i + 1}` : '', trial, results[i]));
+    } else {
+      groups = [group('', payload?.forms?.[form]?.[point], computed)];
+    }
+    groups = groups.filter(g => g.rows.length || g.issues.length);
+    return { form: formConfig.title || form.toUpperCase(), point: snapshotPoint(system, config, form, point), status: pointStatus(system, snapshot?.evaluation, form, point), groups };
+  };
+  window.CPC1RunsUI = { campaignScope, validateSingleScope, validateCalibration, calibrationGroups, carriedExpiry, trendRoute, closedTrendHistory, trendSeries, overviewSummary, pointGrid, pointDetail };
   if (typeof document === 'undefined') return;
   const route=trendRoute(location.search);
   const $ = id => document.getElementById(id);
@@ -301,7 +360,7 @@
   async function download(source) { try { const blob = await window.CPC1Backend.downloadHistorySource(source.object_path); const url = URL.createObjectURL(blob), a = el('a',{href:url,download:source.title || 'nguon-lich-su.pdf'}); document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url); } catch(error) { message(errorText(error)); } }
   async function load() { const token=++state.loadToken;state.accessRevision++;state.snapshots.clear();state.levels.clear();state.levelErrors.clear();state.snapshotErrors.clear();state.pendingSnapshots.clear();state.configs={};state.runs=[];state.history=[];renderRuns();renderTrend();try { const backend = window.CPC1Backend; const session = await backend.getSession(); if (!session)throw new Error('Đăng nhập VMP để xem dữ liệu.'); const visible=availableSystems(backend), archiveVisible=Object.keys(systems).filter(system=>backend.permissionsFor(system).can_view&&(!route.dedicated||system===route.system)), entering=availableSystems(backend,true); const configs={}; for (const system of visible) configs[system]=system==='steam'?await backend.getConfig():await backend.getGasConfig(system); const [runs,history]=await Promise.all([backend.listRuns(),backend.listHistory()]); if(token!==state.loadToken)return; $('create-run').hidden=!entering.length;state.configs=configs; state.runs=runs || []; state.history=history || []; state.activeSystem=route.dedicated&&archiveVisible.includes(route.system)?route.system:archiveVisible[0]||''; renderCampaignSystems(); selectOptions($('single-system'), entering.map(value=>({value,label:systems[value]}))); selectOptions($('trend-system'), archiveVisible.map(value=>({value,label:systems[value]})),state.activeSystem); renderRuns(); renderTrend();toggleMode();message('Đã tải dữ liệu đợt và xu hướng.'); } catch(error) { if(token!==state.loadToken)return;message(errorText(error)); $('run-list').replaceChildren(el('p',{className:'empty',text:'Không tải được danh sách đợt. Dữ liệu đang nhập vẫn được giữ.'})); } }
   // ---- Tab Tổng quan ----
-  const overviewState = { token: 0, loaded: false };
+  const overviewState = { token: 0, loaded: false, data: null, grid: null, gridToken: 0, snapshots: new Map(), runList: null };
   const overviewYear = () => Number(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(0, 4));
   const SIGN_LABEL = { chua_ky: 'Chưa ký', da_kiem_tra: 'Đã kiểm tra', da_duyet: 'Đã duyệt' };
   function overviewStat(label, value, sub) {
@@ -334,7 +393,8 @@
     s.pq.forEach(item => pq.append(el('li', {}, [el('span', { text: item.id }), el('strong', { text: item.status_validation_text || item.status_validation || '—' })])));
     card.append(el('p', { className: 'ov-caption', text: 'PQ trong kế hoạch VMP' }), pq, el('p', { className: 'ov-caption', text: 'Đợt gần nhất' }));
     if (!s.latest) { card.append(el('p', { className: 'empty', text: `Chưa có đợt trong năm ${year}` })); return card; }
-    card.append(overviewRun(s.latest, s.system));
+    card.append(overviewRun(s.latest, s.system),
+      el('button', { type: 'button', className: 'ov-open-grid', text: 'Xem bảng điểm', onclick: () => { showPointGrid(s.system, s.latest.run_id); $('ov-grid').scrollIntoView({ block: 'start' }); } }));
     if (s.others.length) {
       const more = el('details', { className: 'ov-more' }, [el('summary', { text: `Các đợt khác trong năm (${s.others.length})` })]);
       s.others.forEach(run => more.append(overviewRun(run, s.system)));
@@ -353,11 +413,95 @@
         overviewStat('Hồ sơ đã duyệt', `${sum.approved}/${sum.records}`),
         overviewStat('Điểm không đạt', sum.fail)
       ]),
-      el('div', { className: 'ov-systems' }, sum.systems.map(s => overviewSystem(s, year)))
+      el('div', { className: 'ov-systems' }, sum.systems.map(s => overviewSystem(s, year))),
+      el('section', { id: 'ov-grid', className: 'panel ov-grid', 'aria-labelledby': 'ov-grid-title' })
     );
+    overviewState.data = data;
+    const first = sum.systems.find(s => s.latest);
+    if (first) showPointGrid(overviewState.grid?.system && sum.systems.some(s => s.system === overviewState.grid.system && s.runs.some(r => r.run_id === overviewState.grid.runId)) ? overviewState.grid.system : first.system,
+      overviewState.grid?.runId && sum.systems.some(s => s.runs.some(r => r.run_id === overviewState.grid.runId)) ? overviewState.grid.runId : first.latest.run_id);
+    else $('ov-grid').append(el('h3', { id: 'ov-grid-title', text: 'Bảng điểm lấy mẫu' }), el('p', { className: 'empty', text: 'Chưa có đợt để xem.' }));
+  }
+  // ---- Bảng điểm lấy mẫu (trong tab Tổng quan) ----
+  const STATUS_MARK = { pass: ['✓', 'Đạt'], fail: ['✗', 'Không đạt'], invalid: ['!', 'Cần kiểm tra'], pending: ['—', 'Chưa có kết quả'] };
+  async function runScope(runId, system) {
+    const find = runs => (runs || []).find(r => r.id === runId)?.items?.find(i => i.system === system)?.scope;
+    let scope = find(state.runs);
+    if (!scope) { overviewState.runList = overviewState.runList || await window.CPC1Backend.listRuns(); scope = find(overviewState.runList); }
+    if (!scope) throw new Error('Không đọc được phạm vi điểm của đợt.');
+    return scope;
+  }
+  async function gridSnapshot(recordId, version) {
+    const key = `${recordId}:${version}`;
+    if (!overviewState.snapshots.has(key)) overviewState.snapshots.set(key, window.CPC1Backend.historySnapshot(recordId, version));
+    try { return await overviewState.snapshots.get(key); } catch (error) { overviewState.snapshots.delete(key); throw error; }
+  }
+  async function showPointGrid(system, runId) {
+    const token = ++overviewState.gridToken, host = $('ov-grid');
+    if (!host) return;
+    overviewState.grid = { system, runId };
+    const systemsData = overviewSummary(overviewState.data).systems, sys = systemsData.find(s => s.system === system), run = sys?.runs.find(r => r.run_id === runId);
+    const systemSelect = el('select', { id: 'ov-grid-system', 'aria-label': 'Hệ thống' }), runSelect = el('select', { id: 'ov-grid-run', 'aria-label': 'Đợt' });
+    selectOptions(systemSelect, systemsData.filter(s => s.runs.length).map(s => ({ value: s.system, label: systems[s.system] || s.system })), system);
+    selectOptions(runSelect, (sys?.runs || []).map(r => ({ value: r.run_id, label: `${r.title} · ${ngayVN(r.started_on)}` })), runId);
+    systemSelect.addEventListener('change', () => { const next = systemsData.find(s => s.system === systemSelect.value); if (next?.latest) void showPointGrid(next.system, next.latest.run_id); });
+    runSelect.addEventListener('change', () => void showPointGrid(system, runSelect.value));
+    const body = el('div', { className: 'ov-grid-body', 'aria-live': 'polite' }, [el('p', { className: 'empty', text: 'Đang tải…' })]);
+    host.replaceChildren(
+      el('div', { className: 'ov-grid-head' }, [el('h3', { id: 'ov-grid-title', text: 'Bảng điểm lấy mẫu' }), el('div', { className: 'ov-grid-pick' }, [systemSelect, runSelect])]),
+      body);
+    if (!run) { body.replaceChildren(el('p', { className: 'empty', text: 'Chưa có đợt để xem.' })); return; }
+    try {
+      const [scope, snapshot] = await Promise.all([runScope(runId, system), gridSnapshot(run.record_id, run.version)]);
+      if (token !== overviewState.gridToken) return;
+      renderPointGrid(body, system, scope, snapshot);
+    } catch (error) {
+      if (token !== overviewState.gridToken) return;
+      body.replaceChildren(el('p', { className: 'form-error', role: 'alert', text: errorText(error) }),
+        el('button', { type: 'button', text: 'Thử lại', onclick: () => void showPointGrid(system, runId) }));
+    }
+  }
+  function renderPointGrid(body, system, scope, snapshot) {
+    const grid = pointGrid(system, scope, snapshot), c = grid.counts;
+    if (!grid.points.length) { body.replaceChildren(el('p', { className: 'empty', text: 'Đợt này chưa có điểm lấy mẫu.' })); return; }
+    const detail = el('div', { className: 'ov-point-detail', id: 'ov-point-detail', 'aria-live': 'polite' }, [el('p', { className: 'help', text: 'Bấm một ô để xem số liệu.' })]);
+    const showDetail = (form, point, button) => {
+      body.querySelectorAll('.ov-cell[aria-pressed="true"]').forEach(b => b.setAttribute('aria-pressed', 'false'));
+      button.setAttribute('aria-pressed', 'true');
+      const d = pointDetail(system, snapshot, form, point), [mark, text] = STATUS_MARK[d.status];
+      detail.replaceChildren(
+        el('h4', { text: `${point} · ${d.form}` }),
+        el('p', { className: 'help', text: window.CPC1PointLabels?.label(d.point) || point }),
+        el('p', {}, [el('span', { className: `ov-mark st-${d.status}`, text: `${mark} ${text}` })]),
+        ...(d.groups.length ? d.groups.map(g => el('div', { className: 'ov-detail-group' }, [
+          g.title ? el('strong', { text: g.title }) : '',
+          el('dl', {}, g.rows.flatMap(r => [el('dt', { text: r.label }), el('dd', { text: r.unit ? `${r.value} ${r.unit}` : r.value })])),
+          ...(g.issues.length ? [el('ul', { className: 'ov-issues' }, g.issues.map(t => el('li', { text: t })))] : [])
+        ])) : [el('p', { className: 'empty', text: 'Chưa nhập số liệu.' })]));
+    };
+    const table = el('table', { className: 'ov-point-table' }, [
+      el('caption', { text: `Đã có kết quả ${c.pass + c.fail}/${c.total} · Không đạt ${c.fail} · Cần kiểm tra ${c.invalid} · Chưa có kết quả ${c.pending}` }),
+      el('thead', {}, [el('tr', {}, [el('th', { scope: 'col', text: 'Điểm' }), ...grid.forms.map(f => el('th', { scope: 'col', text: `${f.id.toUpperCase()} · ${f.title}` }))])]),
+      el('tbody', {}, grid.points.map(p => el('tr', {}, [
+        el('th', { scope: 'row' }, [el('strong', { text: p.id }), el('span', { className: 'help', text: window.CPC1PointLabels?.name?.(p.point) || p.point.name || '' })]),
+        ...grid.forms.map(f => {
+          const status = p.cells[f.id];
+          if (!status) return el('td', { className: 'ov-cell-none', text: '' });
+          const [mark, text] = STATUS_MARK[status];
+          const button = el('button', { type: 'button', className: `ov-cell st-${status}`, 'aria-pressed': 'false', 'aria-label': `${p.id} · ${f.id.toUpperCase()}: ${text}`, title: text, text: mark });
+          button.addEventListener('click', () => showDetail(f.id, p.id, button));
+          return el('td', {}, [button]);
+        })
+      ])))
+    ]);
+    body.replaceChildren(
+      el('ul', { className: 'ov-legend', 'aria-label': 'Chú giải' }, Object.entries(STATUS_MARK).map(([k, [mark, text]]) => el('li', {}, [el('span', { className: `ov-mark st-${k}`, text: mark }), text]))),
+      el('div', { className: 'table-scroll', tabindex: '0', role: 'region', 'aria-label': 'Bảng điểm lấy mẫu, cuộn ngang được' }, [table]),
+      detail);
   }
   async function loadOverview() {
     const token = ++overviewState.token, body = $('overview-body');
+    overviewState.snapshots.clear(); overviewState.runList = null;
     body.replaceChildren(el('p', { className: 'empty', text: 'Đang tải…' }));
     try {
       const data = await window.CPC1Backend.overview(overviewYear());
