@@ -128,3 +128,21 @@ test('single-use expiry carries over from the latest run of the same year while 
   assert.deepEqual(plain(ui.carriedExpiry([item('air')], runs, '2027-01-10')), {}, 'a new year asks again');
   assert.deepEqual(plain(ui.carriedExpiry([item('air')], [runs[1]], '2026-10-26')), {}, 'expired values are not reused');
 });
+
+test('overview summary counts open runs once, approved records and failed points across systems', () => {
+  const line = (run_id, status, sign_state, fail) => ({ run_id, status, sign_state, progress: { total: 10, complete: 5, fail } });
+  const sum = ui.overviewSummary({ year: 2026, systems: [
+    { system: 'air', objects: ['HT-12'], pq_items: [{ id: 'HT-12/2026.01-PQ' }], runs: [line('r2', 'open', 'chua_ky', 1), line('r1', 'closed', 'da_duyet', 0)] },
+    { system: 'nitrogen', objects: ['HT-13'], pq_items: [], runs: [line('r2', 'open', 'da_kiem_tra', 2)] },
+    { system: 'steam', objects: ['HT-14', 'HT-15'], pq_items: [], runs: [] }
+  ] });
+  assert.equal(sum.openRuns, 1, 'một đợt chung nhiều hệ thống chỉ đếm một lần');
+  assert.equal(sum.records, 3);
+  assert.equal(sum.approved, 1);
+  assert.equal(sum.fail, 3);
+  assert.deepEqual(sum.systems.map(s => [s.system, s.latest?.run_id ?? null, s.others.length]), [['air', 'r2', 1], ['nitrogen', 'r2', 0], ['steam', null, 0]]);
+});
+
+test('overview summary tolerates missing data', () => {
+  assert.deepEqual(plain(ui.overviewSummary(null)), { openRuns: 0, records: 0, approved: 0, fail: 0, systems: [] });
+});

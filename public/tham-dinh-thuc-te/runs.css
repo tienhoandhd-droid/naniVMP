@@ -203,3 +203,27 @@ html[data-theme="dark"] .pq-point-card .pq-outside { fill: var(--pq-rule); }
 .multi-point.vuot-canh-bao{stroke:var(--warning)!important;stroke-width:3}.multi-point.vuot-hanh-dong{stroke:var(--danger)!important;stroke-width:3}
 .trend-signals{display:grid;gap:6px;margin:0 0 14px;padding:0;list-style:none;font-size:14px}.trend-signals:empty{display:none}.trend-signals li{padding:8px 12px;border-left:3px solid var(--warning);border-radius:6px;background:var(--surface-subtle)}.trend-signals li[data-muc="action"]{border-left-color:var(--danger)}.trend-signals li[data-muc="ok"]{border-left-color:var(--success)}
 .nguong-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.nguong-form[hidden]{display:none}.nguong-form label{display:grid;gap:6px;font-size:14px;font-weight:500}.nguong-form .help,.nguong-form .form-error,.nguong-form textarea,.nguong-form label:has(textarea){grid-column:1/-1}.nguong-form button{justify-self:start}#nguong-bang tr[data-hien-hanh="false"]{color:var(--text-secondary)}@media(max-width:640px){.nguong-form{grid-template-columns:1fr}}
+/* Tab Tổng quan (09/11/2026). */
+#overview-panel .panel-heading{margin-bottom:18px}
+.ov-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.ov-stat{display:grid;gap:4px;padding:16px;border:1px solid var(--border);border-radius:var(--radius-card);background:var(--surface)}
+.ov-stat-label{color:var(--text-secondary);font-size:13px;font-weight:500}
+.ov-stat strong{font-size:26px;line-height:1.1}
+.ov-systems{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.ov-system{display:grid;align-content:start;gap:8px;min-width:0}
+.ov-system h3{font-size:16px;margin:0}
+.ov-caption{margin:8px 0 0;color:var(--text-secondary);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.ov-pq{display:grid;gap:4px;margin:0;padding:0;list-style:none;font-size:13px}
+.ov-pq li{display:flex;justify-content:space-between;gap:8px}
+.ov-run{display:grid;gap:6px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-card)}
+.ov-run+.ov-run,.ov-more .ov-run{margin-top:8px}
+.ov-run-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.ov-run-head strong{font-size:14px}
+.ov-run progress{width:100%;height:8px;accent-color:var(--accent)}
+.ov-run .run-progress{margin:0}
+.ov-run-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.tag.sign-da_duyet{color:var(--success)}
+.tag.sign-da_kiem_tra{color:var(--accent)}
+.ov-more summary{cursor:pointer;font-size:13px}
+@media(max-width:1023px){.ov-systems{grid-template-columns:1fr}}
+@media(max-width:640px){.ov-stats{grid-template-columns:1fr}}

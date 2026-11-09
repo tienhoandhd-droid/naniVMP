@@ -150,6 +150,7 @@ export function makeBackend(settings, existingClient, makeSigningClient) {
     canEvaluateActive(){const access=activeSystem?permissionFor(activeSystem):null;return Boolean(runBinding&&access?.can_edit_archive);},
     get runBinding(){return runBinding && {...runBinding};},
     async listRuns(){await requireGlobalView();return rpc('cpc1_run_list');},
+    async overview(year){if(!Number.isSafeInteger(year))throw Error('Năm không hợp lệ.');await requireGlobalView();return rpc('cpc1_overview',{p_year:year});},
     async runRequirements(scope){await requireGlobalView();return rpc('cpc1_run_requirements',{p_scope:scope});},
     async updateRunCalibration(runId,version,calibration,reason,requestId){await requireGlobalView();return rpc('cpc1_run_calibration_update',{p_run_id:runId,p_expected_version:version,p_calibration:calibration,p_reason:reason??null,p_request_id:requestId});},
     async pointHistory(form,point){if(!runBinding)throw Error('Chọn đợt thẩm định trước khi xem lịch sử.');await requireGlobalView();return rpc('cpc1_point_history',{p_record_id:runBinding.recordId,p_form:form,p_point:point});},

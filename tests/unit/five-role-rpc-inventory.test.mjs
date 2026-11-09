@@ -194,6 +194,8 @@ const QUALIFICATION_REVIEWED_RPC = new Map([
   ["cpc1_trend_limit_set", {identity:"cpc1_trend_limit_set(text,text,text,text,text,text,numeric,numeric,date,text)",classification:"guarded_explicit"}],
   ["cpc1_record_signatures", {identity:"cpc1_record_signatures(uuid)",classification:"guarded_explicit"}],
   ["cpc1_record_sign", {identity:"cpc1_record_sign(uuid,integer,text,text,text)",classification:"guarded_explicit"}],
+  // 20261110100000 — tab Tổng quan, chỉ đọc (viewer() + record_pq_right / pq_right).
+  ["cpc1_overview", {identity:"cpc1_overview(integer)",classification:"guarded_explicit"}],
 ]);
 const LOCAL_ACCOUNT_IDS = [1, 2, 3, 4, 5, 6, 7]
   .map((suffix) => `71000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`)
@@ -461,7 +463,13 @@ test("every source RPC call has exactly one reviewed migration classification", 
   const sourceNames = [...sourceInventory.keys()].sort();
   const reviewedNames = [...reviewedInventory.keys()].sort();
 
-  assert.equal(sourceNames.length, 119, "reviewed source HEAD must expose 119 literal RPC targets");
+  assert.equal(sourceNames.length, 120, "reviewed source HEAD must expose 120 literal RPC targets");
+  const tongQuanMigration = readFileSync("supabase/migrations/20261110100000_tham_dinh_tong_quan.sql", "utf8");
+  assert.match(tongQuanMigration, /function public\.cpc1_overview\(p_year integer\)[\s\S]*?stable\s*security definer\s*set search_path = ''[\s\S]*?cpc1_private\.viewer\(\)/i, "cpc1_overview must gate through viewer()");
+  assert.match(tongQuanMigration, /record_pq_right\(i\.record_id, false\)/, "overview runs filter to readable records");
+  assert.match(tongQuanMigration, /pq_right\(array\[p\.id\], false\)/, "overview PQ items filter to readable plan items");
+  assert.match(tongQuanMigration, /revoke all on function public\.cpc1_overview\(integer\) from public, anon, authenticated;/i);
+  assert.match(tongQuanMigration, /revoke all on function cpc1_private\.run_item_progress\(uuid, text\) from public, anon, authenticated;/i);
   const nhatKyMigration = readFileSync("supabase/migrations/20261016170000_tham_dinh_nhat_ky.sql", "utf8");
   for (const [ten, chuKy] of [["cpc1_print_log", "uuid, integer, text, text"], ["cpc1_audit_trail", "text, date, date, integer"]]) {
     assert.match(nhatKyMigration, new RegExp(`function public\\.${ten}\\([^)]*\\)[\\s\\S]*?security definer\\s*set search_path = ''[\\s\\S]*?cpc1_private\\.viewer\\(\\)`, "i"), `${ten} must gate through viewer()`);
