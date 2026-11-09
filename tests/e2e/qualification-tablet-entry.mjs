@@ -245,7 +245,10 @@ try {
  await microbial.fill('KPH');
  // Nội độc tố gel-clot: cảnh báo mềm tại ô, không chặn Lưu. Khoảng trắng đầu/cuối bị cắt trước khi gửi.
  const endotoxin=steamLabels.locator('#form-body [name$=".endotoxin"]');await endotoxin.fill('<0,25');await endotoxin.blur();
- assert.match(await steamLabels.locator(`[id="${await endotoxin.getAttribute('id')}-error"]`).textContent(),/Chưa chấm được — cần QA quyết cách ghi; chưa ký/);
+ assert.match(await steamLabels.locator(`[id="${await endotoxin.getAttribute('id')}-error"]`).textContent(),/Ghi số EU\/mL hoặc Đạt \/ Không đạt; ô này chưa ký được/);
+ assert.equal(await endotoxin.getAttribute('inputmode'),null,'endotoxin uses a text keyboard so Đạt/Không đạt can be typed');
+ await endotoxin.fill('Đạt');await endotoxin.blur();assert.equal(await steamLabels.locator(`[id="${await endotoxin.getAttribute('id')}-error"]`).textContent(),'','gel-clot word accepted without warning');
+ await endotoxin.fill('<0,25');await endotoxin.blur();
  assert.equal(await endotoxin.getAttribute('aria-invalid'),null,'soft warning does not mark the field invalid');
  await steamLabels.locator('#form-body [name$=".toc"]').fill('  5 ');await steamLabels.locator('#form-body [name$=".sample_chem"]').fill('   ');
  await steamLabels.locator('#record-save').click();

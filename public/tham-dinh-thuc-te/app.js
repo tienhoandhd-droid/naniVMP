@@ -58,7 +58,9 @@
     wrapper.append(el('label', { for: id, text: unit ? `${label} (${unit})` : label }));
     // Vi sinh BM02 nhận số CFU hoặc KPH/KFH (không phát hiện) như khí nén: bàn phím chữ, vẫn kiểm số khi gõ số.
     const notDetected = /^bm02\..*\.microbial$/.test(key);
-    const input = type === 'textarea' ? el('textarea', { id, name: key, maxlength: '500' }) : type === 'select' ? el('select', { id, name: key }) : el('input', { id, name: key, type: type === 'number' ? 'text' : type, maxlength: type === 'text' ? '160' : '40', inputmode: type === 'number' && !notDetected ? 'decimal' : undefined });
+    // Nội độc tố gel-clot ghi "Đạt"/"Không đạt" như bản scan (09/11) hoặc số EU/mL: cũng cần bàn phím chữ.
+    const endotoxinField = /^bm02\..*\.endotoxin$/.test(key);
+    const input = type === 'textarea' ? el('textarea', { id, name: key, maxlength: '500' }) : type === 'select' ? el('select', { id, name: key }) : el('input', { id, name: key, type: type === 'number' ? 'text' : type, maxlength: type === 'text' ? '160' : '40', inputmode: type === 'number' && !notDetected && !endotoxinField ? 'decimal' : undefined });
     if (type === 'select') (options || []).forEach(option => input.append(el('option', { value: option.value, text: option.label })));
     const dataPath=key.split('.').map((part,index)=>index===1&&['bm01','bm02','bm03','bm04'].includes(key.split('.')[0])?part.replaceAll('__dot__','.'):/^\d+$/.test(part)?Number(part):part);
     // Người thực hiện + thời gian: máy chủ tự ghi lúc lưu (tên tài khoản, giờ lưu đầu) — chỉ hiển thị.
@@ -67,7 +69,7 @@
     const locked=Boolean(state.config?._run)&&(!entryHistory.canEdit({system:'steam',form:state.active,point:locationId(),data:state.data,path:dataPath})||entryHistory.isCalibrationPath(state.config,dataPath));
     input.setAttribute('aria-describedby', `${id}-error`); input.value = safeText(value, type === 'textarea' ? 500 : 160); if (readOnly||locked) { input.readOnly = true; input.classList.add('readonly'); }
     if (!readOnly&&!locked) { Checks.watch(input, { type, unit, key: dataPath.at(-1), label, notDetected }); input.addEventListener('input', () => { writePath(key, input.value); state.problems = state.problems.filter(problem => locate(problem.path) !== input); markDirty(); }); }
-    wrapper.append(input); if (notDetected) wrapper.append(el('p', { className: 'field-help', text: 'Nhập số CFU/100 mL hoặc KPH/KFH (không phát hiện).' })); wrapper.append(el('p', { className: 'field-error', id: `${id}-error` })); return wrapper;
+    wrapper.append(input); if (notDetected) wrapper.append(el('p', { className: 'field-help', text: 'Nhập số CFU/100 mL hoặc KPH/KFH (không phát hiện).' })); if (endotoxinField) wrapper.append(el('p', { className: 'field-help', text: 'Nhập số EU/mL hoặc Đạt / Không đạt.' })); wrapper.append(el('p', { className: 'field-error', id: `${id}-error` })); return wrapper;
   }
   function safeLocationKey(id) { return id.replaceAll('.', '__dot__'); }
   function pathKey(section, id, trial, key) { return `${section}.${safeLocationKey(id)}.${trial}.${key}`; }

@@ -4,8 +4,8 @@
   const $ = id => document.getElementById(id);
   const HE = { steam: 'Hơi tinh khiết', air: 'Khí nén', nitrogen: 'Khí nitơ' };
   const LOAI = { luu: 'Lưu phiên bản', sua: 'Sửa số liệu', dot: 'Sự kiện đợt', in: 'In PDF' };
-  const DOT = { created: 'Tạo đợt', history_imported: 'Nhập dữ liệu lịch sử', closed: 'Kết thúc đợt', completed: 'Hoàn thành đợt', calibration_updated: 'Đổi hạn thiết bị' };
-  const LUU = { save_draft: 'Lưu' };
+  const DOT = { created: 'Tạo đợt', history_imported: 'Nhập dữ liệu lịch sử', closed: 'Kết thúc đợt', completed: 'Hoàn thành đợt', calibration_updated: 'Đổi hạn thiết bị', record_rescored: 'Chấm lại hồ sơ (giữ nguyên số liệu)' };
+  const LUU = { save_draft: 'Lưu', rescore: 'Chấm lại — số liệu không đổi' };
   let rows = [];
   // dd/mm/yyyy HH:mm theo giờ VN — tự ghép để không phụ thuộc thứ tự locale của trình duyệt.
   const thoiDiem = iso => {

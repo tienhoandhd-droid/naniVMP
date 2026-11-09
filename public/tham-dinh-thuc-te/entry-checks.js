@@ -4,7 +4,12 @@
   'use strict';
   const THOUSAND = 'Số dễ nhầm hàng nghìn — gõ 4000 hoặc 4,0';
   // Thông báo tại ô giữ ngắn (một dòng ở bề rộng ô máy tính bảng) để hiện lỗi không đẩy bố cục.
-  const SOFT_ENDOTOXIN = 'Chưa chấm được — cần QA quyết cách ghi; chưa ký.';
+  const SOFT_ENDOTOXIN = 'Ghi số EU/mL hoặc Đạt / Không đạt; ô này chưa ký được.';
+  const isEndotoxin = (spec = {}) => /EU\/mL/i.test(String(spec.unit || '')) || spec.key === 'endotoxin';
+  const endotoxinWord = text => {
+    const t = String(text || '').normalize('NFC').trim().replace(/\s+/g, ' ');
+    return ['Đạt', 'đạt', 'ĐẠT'].includes(t) ? 'pass' : ['Không đạt', 'không đạt', 'Không Đạt', 'KHÔNG ĐẠT'].includes(t) ? 'fail' : '';
+  };
   const MIN_DATE = '2020-01-01', MAX_DEADLINE = '2099-12-31';
   const blank = value => value == null || String(value).trim() === '';
   const iso = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -52,14 +57,17 @@
     const text = String(value).trim();
     // Vi sinh ghi "không phát hiện" bằng chữ (KPH/KFH) như khí nén đang nhận.
     if (spec.notDetected && /^(KPH|KFH)$/i.test(text)) return '';
+    // Nội độc tố gel-clot ghi chữ như bản scan (quyết định 09/11): khớp cpc1_private.endotoxin_word.
+    if (isEndotoxin(spec) && endotoxinWord(text)) return '';
     if (spec.type === 'number') return checkNumber(text, spec);
     // Ô chữ có đơn vị đếm (vi sinh khí nén/nitơ CFU/m³): KPH/KFH hoặc số nguyên không âm — khớp máy chủ.
     if (spec.type === 'text' && kind(spec).count) return /^(KPH|KFH)$/i.test(text) ? '' : checkNumber(text, spec);
     if (spec.type === 'date') return checkDate(text, spec, options);
     return '';
   }
-  // Nội độc tố (EU/mL): chủ dự án chưa quyết cách ghi gel-clot nên chỉ cảnh báo mềm, không chặn Lưu.
-  const soft = (spec = {}) => /EU\/mL/i.test(String(spec.unit || '')) || spec.key === 'endotoxin';
+  // Nội độc tố (EU/mL): ghi số hoặc "Đạt"/"Không đạt" (gel-clot). Chữ khác chỉ cảnh báo mềm, không chặn Lưu
+  // nhưng máy chủ chặn Ký — giữ như 21/10.
+  const soft = (spec = {}) => isEndotoxin(spec);
   // Người thực hiện + thời gian do máy chủ tự ghi lúc lưu (tên tài khoản, giờ lưu đầu) — không nhập tay.
   // Trả 'name' | 'time' | '' theo đường dẫn dữ liệu (hơi: bm01–bm04 từng lần đo và phần tổng hợp; khí: từng điểm và chứng dương).
   function autoField(path) {
@@ -173,5 +181,5 @@
     if (!button && stage === 'error') { button = node('button', { id: 'record-save-retry', type: 'button', class: 'button secondary save-retry', text: 'Thử lại' }); state.after(button); }
     if (button) { button.hidden = stage !== 'error'; if (retry) button.onclick = retry; }
   }
-  window.CPC1EntryChecks = Object.freeze({ autoField, stampText, THOUSAND, SOFT_ENDOTOXIN, soft, blocking, trimAll, thousandAmbiguous, thousandExempt, kind, dateBounds, check, checkAll, sentence, serverProblems, today, show, clearField, watch, saveStatus });
+  window.CPC1EntryChecks = Object.freeze({ autoField, stampText, THOUSAND, SOFT_ENDOTOXIN, soft, endotoxinWord, blocking, trimAll, thousandAmbiguous, thousandExempt, kind, dateBounds, check, checkAll, sentence, serverProblems, today, show, clearField, watch, saveStatus });
 })();
