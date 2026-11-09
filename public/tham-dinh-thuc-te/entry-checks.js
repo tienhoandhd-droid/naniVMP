@@ -134,7 +134,7 @@
   }
   function markInput(input, message) {
     input.setAttribute('aria-invalid', 'true');
-    const error = $(input.id + '-error'); if (error) { error.textContent = message; error.title = message; }
+    const error = $(input.id + '-error'); if (error) { error.textContent = message; error.title = message; error.classList.remove('is-warning'); }
   }
   function show(problems, { locate, label, go }) {
     const box = $('error-summary'); if (!box || !problems.length) return null;
@@ -155,7 +155,7 @@
   function clearField(input) {
     if (!input?.id) return;
     input.removeAttribute('aria-invalid');
-    const error = $(input.id + '-error'); if (error) error.textContent = '';
+    const error = $(input.id + '-error'); if (error) { error.textContent = ''; error.classList.remove('is-warning'); }
     const box = $('error-summary');
     if (!box || box.hidden) return;
     const link = box.querySelector(`a[href="#${CSS.escape(input.id)}"]`);

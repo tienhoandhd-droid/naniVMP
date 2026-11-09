@@ -144,6 +144,17 @@ try {
  assert.equal(await equipment.locator('[name="equipment.balance_due"]').count(),0);
  assert.equal(await equipment.locator('[name="equipment.balance_status"]').count(),1,'equipment condition remains available');
  assert.equal(await equipment.locator('[name="equipment.thermometer_due"]').count(),1,'legacy unbound date remains available');
+ // 09/11: T3 ngoài 100–140 °C là cảnh báo từ máy chủ — hiện tại ô, không đánh dấu lỗi, không vào hộp lỗi.
+ const warnPoint=steam.locations[0].id;
+ await equipment.evaluate(point=>{window.CPC1_API.evaluate=async()=>({forms:{bm03:{rows:{[point]:[{status:'incomplete',errors:{}},{status:'pass',errors:{},warnings:{t3:'Ngoài 100–140 °C, đối chiếu bản scan.'},values:{result:'0.96'}},{status:'incomplete',errors:{}}]}}},overall:'incomplete'});},warnPoint);
+ if(await equipment.locator('#entry-continue').isVisible())await equipment.locator('#entry-continue').click();
+ await equipment.locator('#evaluate').click();
+ const t3=equipment.locator('#form-body input[name$=".1.t3"]');await t3.waitFor();
+ const t3Note=equipment.locator(`[id="${await t3.getAttribute('id')}-error"]`);await t3Note.getByText('Ngoài 100–140 °C, đối chiếu bản scan.').waitFor();
+ assert.equal(await t3Note.evaluate(n=>n.classList.contains('is-warning')),true,'T3 warning styled as warning');
+ assert.equal(await t3.getAttribute('aria-invalid'),null,'T3 warning does not mark field invalid');
+ assert.equal(await equipment.locator('#error-summary').isHidden(),true,'T3 warning stays out of error summary');
+ assert.notEqual(await t3Note.evaluate(n=>getComputedStyle(n).color),await equipment.evaluate(()=>{const p=document.createElement('p');p.className='field-error';document.body.append(p);const c=getComputedStyle(p).color;p.remove();return c;}),'warning colour differs from error colour');
  await equipment.close();
  const nitrogenPage=await localPage();await nitrogenPage.setViewportSize({width:820,height:1180});await nitrogenPage.goto(`http://qualification.test/tham-dinh-thuc-te/gas.html?system=nitrogen&form=bm05&run=${nitrogenBm05.id}&record=${nitrogenBm05.items[0].record_id}`);
  await nitrogenPage.locator('#entry-continue').click();const nitrogenInput=nitrogenPage.locator('#form-body input[inputmode="decimal"]').first();await nitrogenPage.evaluate(()=>scrollTo(0,0));

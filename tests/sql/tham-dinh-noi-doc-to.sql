@@ -65,11 +65,27 @@ select pg_temp.ok('10 hồ sơ 03/2026 chấm lại: BM02 không còn invalid',
   not exists (select 1 from jsonb_each(cpc1_private.evaluate(v.payload)->'forms'->'bm02'->'locations') l where l.value #>> '{}' = 'invalid'),
   (cpc1_private.evaluate(v.payload)->'forms'->'bm02'->'locations')::text)
 from public.cpc1_revisions v where v.record_id = '40bde8cb-c9fe-4f7e-bb31-43e030821c07' and v.version = 2;
-select pg_temp.ok('11 hồ sơ 03/2026: bộ kiểm khi ký chỉ còn 1 ô (BM03 T3 = 140,2)',
-  (select jsonb_agg(x->'path') from jsonb_array_elements(cpc1_private.evaluation_invalid_cells(cpc1_private.evaluate(v.payload))) x) is not null
-  and jsonb_array_length(cpc1_private.evaluation_invalid_cells(cpc1_private.evaluate(v.payload))) = 1,
+select pg_temp.ok('11 hồ sơ 03/2026: không còn ô chặn ký (T3 = 140,2 chỉ cảnh báo, 09/11)',
+  jsonb_array_length(cpc1_private.evaluation_invalid_cells(cpc1_private.evaluate(v.payload))) = 0,
   cpc1_private.evaluation_invalid_cells(cpc1_private.evaluate(v.payload))::text)
 from public.cpc1_revisions v where v.record_id = '40bde8cb-c9fe-4f7e-bb31-43e030821c07' and v.version = 2;
+
+-- T3 BM03 (migration 20261110120000): ngoài 100–140 °C chỉ cảnh báo; ngoài bảng tra 100–180 °C vẫn chặn.
+create function pg_temp.bm03(p_t3 text) returns jsonb language sql as $$
+  select cpc1_private.row_result('bm03', jsonb_build_object('me', '0,647', 'ms', '1,292', 'mf', '1,364', 't1', '23,5', 't2', '80,3', 't3', p_t3)) $$;
+select pg_temp.ok('15 T3 = 140,2 (bản scan B3.R13-P2 lần 2): Đạt 0,96, L = 2143,99, có cảnh báo, không lỗi',
+  r->>'status' = 'pass' and r->'values'->>'print_result' = '0.96' and (r->'values'->>'latent')::numeric = 2143.99
+  and r->'warnings' ? 't3' and r->'errors' = '{}'::jsonb, r::text)
+from (select pg_temp.bm03('140,2') r) z;
+select pg_temp.ok('16 T3 = ' || x.t || ' → ' || x.mong, (pg_temp.bm03(x.t)->>'status' = 'invalid') = (x.mong = 'chặn')
+  and coalesce((pg_temp.bm03(x.t)->'warnings') ? 't3', false) = (x.mong = 'cảnh báo'), pg_temp.bm03(x.t)::text)
+from (values ('99,9', 'chặn'), ('100', 'không'), ('140', 'không'), ('140,1', 'cảnh báo'), ('180', 'cảnh báo'), ('180,1', 'chặn')) x(t, mong);
+select pg_temp.ok('17 T3 trong 100–140 không có khoá warnings', not (pg_temp.bm03('121') ? 'warnings'));
+select pg_temp.ok('18 bộ kiểm khi ký bỏ qua cảnh báo T3',
+  jsonb_array_length(cpc1_private.evaluation_invalid_cells(jsonb_build_object('forms', jsonb_build_object('bm03',
+    jsonb_build_object('rows', jsonb_build_object('B3.R13-P2', jsonb_build_array(pg_temp.bm03('140,2')))))))) = 0
+  and jsonb_array_length(cpc1_private.evaluation_invalid_cells(jsonb_build_object('forms', jsonb_build_object('bm03',
+    jsonb_build_object('rows', jsonb_build_object('B3.R13-P2', jsonb_build_array(pg_temp.bm03('181')))))))) = 1);
 
 -- Xu hướng: giá trị định tính bị bỏ qua, không làm lỗi (trước đây ép ::numeric → lỗi cả màn Lịch sử).
 select pg_temp.ok('13 trend_rows bỏ qua nội độc tố "Đạt", vẫn giữ số và các chỉ tiêu khác',

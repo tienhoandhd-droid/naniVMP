@@ -126,6 +126,7 @@ input::placeholder,textarea::placeholder { color:var(--text-secondary); opacity:
 .field .help { display:block; margin-top:8px; font-size:13px; }
 .field-error { color:var(--danger); font-size:13px; margin-top:8px; }
 .field-error:empty { display:none; }
+.field-error.is-warning { color:var(--warning); }
 [aria-invalid="true"] { border:2px solid var(--danger); }
 .trial-groups { display:grid; gap:24px; }
 .trial-group { min-width:0; margin:0; padding:16px 0; border:0; border-top:1px solid var(--border-strong); border-radius:0; }
