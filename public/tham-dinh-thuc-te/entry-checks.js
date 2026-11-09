@@ -7,8 +7,9 @@
   const SOFT_ENDOTOXIN = 'Ghi số EU/mL hoặc Đạt / Không đạt; ô này chưa ký được.';
   const isEndotoxin = (spec = {}) => /EU\/mL/i.test(String(spec.unit || '')) || spec.key === 'endotoxin';
   const endotoxinWord = text => {
-    const t = String(text || '').normalize('NFC').trim().replace(/\s+/g, ' ');
-    return ['Đạt', 'đạt', 'ĐẠT'].includes(t) ? 'pass' : ['Không đạt', 'không đạt', 'Không Đạt', 'KHÔNG ĐẠT'].includes(t) ? 'fail' : '';
+    // Khớp cpc1_private.endotoxin_word: NFC, mọi khoảng trắng (cả NBSP khi dán) gộp một dấu cách, không phân biệt hoa/thường.
+    const t = String(text || '').normalize('NFC').replace(/[\s\u00A0]+/g, ' ').trim().toLowerCase();
+    return t === 'đạt' ? 'pass' : t === 'không đạt' ? 'fail' : '';
   };
   const MIN_DATE = '2020-01-01', MAX_DEADLINE = '2099-12-31';
   const blank = value => value == null || String(value).trim() === '';

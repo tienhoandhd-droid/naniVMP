@@ -121,8 +121,8 @@ test('nội độc tố (EU/mL) chỉ cảnh báo mềm, không chặn lưu — 
  assert.deepEqual(plain(c.blocking(problems).map(p=>p.path.at(-1))),['toc']);
  assert.match(c.SOFT_ENDOTOXIN,/Ghi số EU\/mL hoặc Đạt \/ Không đạt; ô này chưa ký được/);
  // 09/11: gel-clot ghi chữ như bản scan — khớp cpc1_private.endotoxin_word.
- for(const word of ['Đạt','đạt','ĐẠT',' Đạt ','Đạt'.normalize('NFD'),'Không đạt','không  đạt','KHÔNG ĐẠT'])assert.equal(c.check(word,endotoxin),'',`"${word}" hợp lệ`);
- for(const word of ['OK','Dat','<0,25'])assert.notEqual(c.check(word,endotoxin),'',`"${word}" vẫn cảnh báo`);
+ for(const word of ['Đạt','đạt','ĐẠT',' Đạt ','Đạt\n','Đạt'.normalize('NFD'),'Không đạt','không  đạt','KHÔNG ĐẠT','không Đạt','KHÔNG đạt','Không\u00A0đạt'])assert.equal(c.check(word,endotoxin),'',`"${word}" hợp lệ`);
+ for(const word of ['OK','Dat','<0,25','\u00D0ạt','Khongdat'])assert.notEqual(c.check(word,endotoxin),'',`"${word}" vẫn cảnh báo`);
  assert.equal(c.endotoxinWord('Không đạt'),'fail');assert.equal(c.endotoxinWord('Đạt'),'pass');assert.equal(c.endotoxinWord('0,1'),'');
 });
 

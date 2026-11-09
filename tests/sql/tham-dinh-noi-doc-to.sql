@@ -26,8 +26,9 @@ end $$;
 -- Nhận dạng chữ: các cách viết hợp lệ, khoảng trắng thừa, dạng Unicode tách dấu (NFD).
 select pg_temp.ok('02 nhận dạng ' || x.raw, cpc1_private.endotoxin_word(x.raw) is not distinct from x.mong, coalesce(cpc1_private.endotoxin_word(x.raw), 'null'))
 from (values ('Đạt', 'pass'), ('đạt', 'pass'), ('ĐẠT', 'pass'), ('  Đạt ', 'pass'), (normalize('Đạt', NFD), 'pass'),
-             ('Không đạt', 'fail'), ('không  đạt', 'fail'), ('KHÔNG ĐẠT', 'fail'),
-             ('OK', null), ('Dat', null), ('<0,25', null), ('0,1', null), ('', null)) x(raw, mong);
+             ('Không đạt', 'fail'), ('không  đạt', 'fail'), ('KHÔNG ĐẠT', 'fail'), ('không Đạt', 'fail'), ('KHÔNG đạt', 'fail'),
+             ('Không' || chr(160) || 'đạt', 'fail'), ('Đạt' || chr(10), 'pass'), (chr(9) || 'Đạt', 'pass'),
+             ('OK', null), ('Dat', null), ('<0,25', null), ('0,1', null), ('', null), (chr(208) || 'ạt', null), ('Khôngđạt', null)) x(raw, mong);
 
 -- Chấm BM02: chữ, số, chữ sai.
 select pg_temp.ok('03 chấm nội độc tố ' || x.endo || ' → ' || x.mong,
@@ -69,6 +70,20 @@ select pg_temp.ok('11 hồ sơ 03/2026: bộ kiểm khi ký chỉ còn 1 ô (BM0
   and jsonb_array_length(cpc1_private.evaluation_invalid_cells(cpc1_private.evaluate(v.payload))) = 1,
   cpc1_private.evaluation_invalid_cells(cpc1_private.evaluate(v.payload))::text)
 from public.cpc1_revisions v where v.record_id = '40bde8cb-c9fe-4f7e-bb31-43e030821c07' and v.version = 2;
+
+-- Xu hướng: giá trị định tính bị bỏ qua, không làm lỗi (trước đây ép ::numeric → lỗi cả màn Lịch sử).
+select pg_temp.ok('13 trend_rows bỏ qua nội độc tố "Đạt", vẫn giữ số và các chỉ tiêu khác',
+  not exists (select 1 from jsonb_array_elements(t) x where x->>'metric' = 'endotoxin')
+  and exists (select 1 from jsonb_array_elements(t) x where x->>'metric' = 'conductivity' and (x->>'value')::numeric = 0.963), t::text)
+from (select cpc1_private.trend_rows('steam', v.payload, cpc1_private.evaluate(v.payload), i.scope) t
+      from public.cpc1_revisions v join cpc1_private.run_items i on i.record_id = v.record_id
+      where v.record_id = '40bde8cb-c9fe-4f7e-bb31-43e030821c07' and v.version = 2) z;
+select pg_temp.ok('14 trend_rows: nội độc tố dạng số vẫn vào xu hướng',
+  exists (select 1 from jsonb_array_elements(t) x where x->>'metric' = 'endotoxin' and (x->>'value')::numeric = 0.1), t::text)
+from (select cpc1_private.trend_rows('steam',
+        jsonb_build_object('bm02', jsonb_build_object('E1.R2-P1', jsonb_build_object('endotoxin', '0,1'))),
+        jsonb_build_object('forms', jsonb_build_object('bm02', jsonb_build_object('rows', jsonb_build_object('E1.R2-P1', pg_temp.bm02('0,1'))))),
+        '{"bm02":["E1.R2-P1"]}'::jsonb) t) z;
 
 select pg_temp.ok('12 endotoxin_word không mở cho authenticated',
   not has_function_privilege('authenticated', 'cpc1_private.endotoxin_word(text)', 'execute'));

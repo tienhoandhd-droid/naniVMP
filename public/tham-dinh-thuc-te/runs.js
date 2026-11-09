@@ -112,7 +112,8 @@
           const raw = String(values[field.key]);
           // Trường chọn (vd. Cảm quan) lưu mã "pass"/"fail": hiện nhãn của lựa chọn trong cấu hình.
           const value = field.type === 'date' ? ngayVN(raw) : (field.options || []).find(o => o.value === raw)?.label || raw;
-          return { label: field.label || field.key, value, unit: field.unit || '' };
+          // Chỉ ghép đơn vị sau số; chữ như "Đạt", "KPH" hiện riêng.
+          return { label: field.label || field.key, value, unit: /^[-+]?[\d.,]+$/.test(value) ? field.unit || '' : '' };
         });
       if (present(computed?.values?.print_result)) rows.push({ label: 'Kết quả tính', value: String(computed.values.print_result).replace('.', ','), unit: '' }); // chỉ hiển thị dấu phẩy thập phân như số nhập
       const issues = Object.entries(computed?.errors || {}).map(([key, text]) => `${labelOf(key)}: ${text}`);

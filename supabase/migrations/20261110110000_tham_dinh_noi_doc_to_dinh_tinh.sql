@@ -8,24 +8,28 @@
 --    chặn ký.
 --  · Vi sinh "KPH"/"KFH" = không phát hiện = Đạt: đã có từ 20261021100000
 --    (read_num), không đổi ở đây.
--- Chỉ sửa hai hàm, thân hàm lấy NGUYÊN VĂN từ production (pg_get_functiondef)
--- rồi chèn đúng hai nhánh mới. Không đổi giới hạn, công thức, biểu mẫu in.
+-- Thân các hàm lấy NGUYÊN VĂN từ production (pg_get_functiondef) rồi chèn nhánh mới:
+--  · row_result, input_object_issues: nhận chữ nội độc tố.
+--  · trend_rows: bỏ qua giá trị định tính (trước đây ép ::numeric → lỗi cả màn Lịch sử).
+--  · cpc1_audit_trail: sự kiện đợt có details.record_id hiện đúng hệ thống/hồ sơ/phiên bản.
+-- Không đổi giới hạn, công thức, biểu mẫu in.
 -- =====================================================================
 begin;
 set local lock_timeout = '5s';
 set local statement_timeout = '120s';
 
--- Nhận dạng chữ của nội độc tố. Danh sách viết tường minh (không dựa vào
--- lower() theo locale); chuẩn hoá NFC + gộp khoảng trắng.
+-- Nhận dạng chữ của nội độc tố: chuẩn hoá NFC, đổi mọi khoảng trắng (cả NBSP
+-- khi dán, xuống dòng) thành một dấu cách, bỏ đầu/cuối, rồi hạ chữ thường.
+-- Chữ có dấu hạ bằng translate() tường minh (không phụ thuộc locale của lower());
+-- lower() chỉ còn lo các chữ ASCII K, H, N, G, T.
 create function cpc1_private.endotoxin_word(raw text)
 returns text
 language sql
 immutable
 set search_path = ''
 as $function$
-  select case regexp_replace(btrim(normalize(coalesce(raw, ''), NFC)), '\s+', ' ', 'g')
-    when 'Đạt' then 'pass' when 'đạt' then 'pass' when 'ĐẠT' then 'pass'
-    when 'Không đạt' then 'fail' when 'không đạt' then 'fail' when 'Không Đạt' then 'fail' when 'KHÔNG ĐẠT' then 'fail'
+  select case lower(translate(btrim(regexp_replace(normalize(coalesce(raw, ''), NFC), '[[:space:]\u00A0]+', ' ', 'g')), 'ĐẠÔ', 'đạô'))
+    when 'đạt' then 'pass' when 'không đạt' then 'fail'
   end
 $function$;
 revoke all on function cpc1_private.endotoxin_word(text) from public, anon, authenticated;
@@ -121,5 +125,100 @@ begin
  end loop;
  return outp;
 end$function$;
+
+CREATE OR REPLACE FUNCTION cpc1_private.trend_rows(s text, d jsonb, ev jsonb, scope jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+declare f text;pts jsonb;pid text;row jsonb;raw jsonb;vals jsonb;entry jsonb;entries jsonb;metric jsonb;metrics jsonb;key text;label text;unit text;value text;measured text;i integer;outp jsonb:='[]';status text;
+begin
+ for f,pts in select * from jsonb_each(scope) loop
+  for pid in select * from jsonb_array_elements_text(pts) loop
+   entries:=case when s='steam' and f<>'bm02' then ev#>array['forms',f,'rows',pid] else jsonb_build_array(ev#>array['forms',f,'rows',pid]) end;
+   i:=0;
+   for row in select * from jsonb_array_elements(coalesce(entries,'[]')) loop
+    i:=i+1;
+    raw:=case when s='steam' then case when f='bm02' then d#>array[f,pid] else d#>array[f,pid,(i-1)::text] end else d#>array['forms',f,pid] end;
+    measured:=case when s='steam' then raw->>'date' when f='bm04' then raw->>'sampling_date' else raw->>'execution_date' end;
+    vals:=row->'values';
+    metrics:=case when s='steam' then case f when 'bm01' then '[["result","Khí không ngưng tụ","%"]]'::jsonb when 'bm02' then '[["conductivity","Độ dẫn điện","µS/cm"],["toc","TOC","ppb"],["microbial","Vi sinh","CFU/100 mL"],["endotoxin","Nội độc tố","EU/mL"]]'::jsonb when 'bm03' then '[["result","Độ khô","D"]]'::jsonb when 'bm04' then '[["result","Quá nhiệt","°C"],["delta","Chênh lệch nhiệt độ","°C"]]'::jsonb end
+    else case f when 'bm01' then '[["p05","Tiểu phân ≥0,5 µm","hạt/m³"],["p5","Tiểu phân ≥5 µm","hạt/m³"]]'::jsonb when 'bm02' then '[["result","Điểm sương","°C"]]'::jsonb when 'bm03' then '[["result","Hàm lượng dầu","mg/m³"]]'::jsonb when 'bm04' then '[["result","Vi sinh","CFU/m³"]]'::jsonb when 'bm05' then '[["result","Độ tinh khiết","%"]]'::jsonb end end;
+    for metric in select * from jsonb_array_elements(coalesce(metrics,'[]')) loop
+     key:=metric->>0;value:=vals->>key;status:=coalesce(row#>>array['parameters',key],row->>'status');
+     if value is null then continue;end if;
+     -- 09/11: kết quả định tính (nội độc tố "Đạt"/"Không đạt") không vẽ xu hướng số.
+     if value !~ '^-?[0-9]+(\.[0-9]+)?$' then continue;end if;
+     outp:=outp||jsonb_build_array(jsonb_build_object('form',f,'point_id',pid,'trial',case when s='steam' and f<>'bm02' then i else null end,'metric',key,'label',metric->>1,'unit',metric->>2,'value',value::numeric,'measured_on',nullif(measured,''),'computed_status',status,'uncertain',false));
+    end loop;
+   end loop;
+  end loop;
+ end loop;
+ return outp;
+end$function$;
+
+CREATE OR REPLACE FUNCTION public.cpc1_audit_trail(p_system text DEFAULT NULL::text, p_from date DEFAULT NULL::date, p_to date DEFAULT NULL::date, p_limit integer DEFAULT 200)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  u uuid := cpc1_private.viewer();
+  v_limit integer := least(greatest(coalesce(p_limit, 200), 1), 1000);
+  v_tu timestamptz := case when p_from is null then '-infinity'::timestamptz else (p_from::timestamp at time zone 'Asia/Bangkok') end;
+  v_den timestamptz := case when p_to is null then 'infinity'::timestamptz else ((p_to + 1)::timestamp at time zone 'Asia/Bangkok') end;
+begin
+  if p_system is not null and p_system not in ('steam', 'air', 'nitrogen') then
+    raise exception 'Hệ thống không hợp lệ.' using errcode = '22023';
+  end if;
+  return jsonb_build_object('ok', true, 'rows', coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'thoi_diem', e.thoi_diem, 'loai', e.loai, 'he_thong', e.he_thong,
+             'dot', rn.title, 'ho_so', e.record_id, 'phien_ban', e.phien_ban,
+             'nguoi', coalesce(p.full_name, 'Không rõ'), 'ly_do', e.ly_do,
+             'thay_doi', e.thay_doi, 'chi_tiet', e.chi_tiet
+           ) order by e.thoi_diem desc, e.loai)
+    from (
+      select hs.* from (
+        -- Mỗi lần lưu phiên bản
+        select a.created_at thoi_diem, 'luu'::text loai, r.system he_thong, a.record_id, a.new_version phien_ban,
+               null::uuid run_id, a.actor_id, null::text ly_do, null::jsonb thay_doi, a.action chi_tiet
+        from cpc1_private.audit a join public.cpc1_records r on r.id = a.record_id
+        union all
+        -- Sửa giá trị đã có: bắt buộc lý do, kèm giá trị cũ/mới
+        select ev.created_at, 'sua', r.system, ev.record_id, ev.version, ev.run_id, ev.actor_id, ev.reason, ev.changes, null
+        from cpc1_private.entry_events ev join public.cpc1_records r on r.id = ev.record_id
+        union all
+        -- Sự kiện đợt: tạo, đổi hạn thiết bị, hoàn thành, kết thúc…
+        -- 09/11: sự kiện gắn một hồ sơ (chấm lại) lấy hệ thống, hồ sơ, phiên bản từ details.
+        select re.created_at, 'dot',
+               coalesce((select r.system from public.cpc1_records r where r.id::text = re.details ->> 'record_id'),
+                        (select i.system from cpc1_private.run_items i where i.run_id = re.run_id order by i.system limit 1)),
+               (select r.id from public.cpc1_records r where r.id::text = re.details ->> 'record_id'),
+               case when re.details ->> 'to_version' ~ '^[0-9]+$' then (re.details ->> 'to_version')::integer end,
+               re.run_id, re.actor_id, re.details ->> 'reason', null, re.action
+        from cpc1_private.run_events re
+        union all
+        -- Mỗi lần in PDF
+        select pe.created_at, 'in', r.system, pe.record_id, pe.version, null, pe.actor_id, null, null,
+               upper(pe.form) || ' · SHA-256 ' || left(pe.pdf_sha256, 12)
+        from cpc1_private.print_events pe join public.cpc1_records r on r.id = pe.record_id
+      ) hs
+      where hs.thoi_diem >= v_tu and hs.thoi_diem < v_den
+        and (p_system is null or hs.he_thong = p_system)
+        and case when hs.record_id is not null then cpc1_private.record_pq_right(hs.record_id, false)
+                 else exists (select 1 from cpc1_private.run_items i
+                              where i.run_id = hs.run_id and cpc1_private.record_pq_right(i.record_id, false)) end
+      order by hs.thoi_diem desc
+      limit v_limit
+    ) e
+    left join public.profiles p on p.id = e.actor_id
+    left join cpc1_private.runs rn on rn.id = coalesce(e.run_id,
+      (select i.run_id from cpc1_private.run_items i where i.record_id = e.record_id limit 1))
+  ), '[]'::jsonb));
+end
+$function$;
 
 commit;

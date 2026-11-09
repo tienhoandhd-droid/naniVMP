@@ -106,7 +106,7 @@ try {
   await page.getByRole('button', { name: 'A1 · BM02: Cần kiểm tra' }).click();
   const chiTiet = (await text(page, '#ov-point-detail')).replace(/\s+/g, ' ');
   assert.match(chiTiet, /A1 · Vi sinh/);
-  assert.match(chiTiet, /Vi sinh KPH CFU\/m³/, 'hiện số gốc đã nhập kèm đơn vị');
+  assert.match(chiTiet, /Vi sinh KPH(?! CFU)/, 'hiện chữ gốc đã nhập, không ghép đơn vị sau chữ');
   assert.match(chiTiet, /Vi sinh: Nhập số thập phân hợp lệ\./, 'hiện lý do cần kiểm tra');
   await page.getByRole('button', { name: 'A1 · BM01: Đạt' }).click();
   assert.match((await text(page, '#ov-point-detail')).replace(/\s+/g, ' '), /Tiểu phân ≥ 0,5 µm 330 hạt\/m³ Người thực hiện Hoàn/);
