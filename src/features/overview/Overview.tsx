@@ -12,7 +12,7 @@ import CompletionDashboard from "../../components/dashboard/CompletionDashboard.
 import MaTranTienDo from "../../components/dashboard/MaTranTienDo.tsx";
 import ChangeSummaryTiles from "../changeValidation/ChangeSummaryTiles.tsx";
 import { useChangeSummary } from "../changeValidation/useChangeSummary.ts";
-import { countUnlinkedChanges, vmpRateWithChanges } from "../changeValidation/changeSummary.ts";
+import { CHANGE_KIND_LABEL, countUnlinkedChanges, vmpRateWithChanges } from "../changeValidation/changeSummary.ts";
 
 const CA_NAM = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -54,6 +54,15 @@ export default function Overview({ acts, setView, access }: {
     ? countUnlinkedChanges(changeSummary.records, currentBangkokYear, CA_NAM, changeSummary.today)
     : null), [changeSummary, currentBangkokYear]);
   const vongRate = phieuChuaGan ? vmpRateWithChanges(e, phieuChuaGan).rate : e.rate;
+  /* Tách riêng từng loại phiếu để người xem biết phần nào trong tỉ lệ là
+     Thay đổi, phần nào là Sai lệch (09/11). Cộng hai loại = phieuChuaGan. */
+  const phieuTheoLoai = useMemo(() => (changeSummary.status === "ready"
+    ? (["thay_doi", "sai_lech"] as const).map((kind) => ({
+      kind,
+      ...countUnlinkedChanges(changeSummary.records.filter((r) => r.recordKind === kind),
+        currentBangkokYear, CA_NAM, changeSummary.today),
+    }))
+    : null), [changeSummary, currentBangkokYear]);
 
   return (
     <div className="vmp-bento vmp-stagger">
@@ -75,10 +84,22 @@ export default function Overview({ acts, setView, access }: {
             <div style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, marginBottom: 15 }}>
               {e.total} hạng mục trong kế hoạch năm
               {(!phieuChuaGan || phieuChuaGan.total > 0) && (
-                <div data-overview-change-note>
-                  {phieuChuaGan
-                    ? `Tỉ lệ gồm ${phieuChuaGan.total} phiếu thay đổi/sai lệch`
-                    : "Tỉ lệ chưa gồm phiếu thay đổi/sai lệch"}
+                <div data-overview-change-note style={{ marginTop: 6 }}>
+                  {phieuTheoLoai ? (
+                    <>
+                      Tỉ lệ gồm:
+                      {[
+                        { id: "vmp", l: "Kế hoạch VMP", done: e.done, total: e.total },
+                        ...phieuTheoLoai.map((p) => ({ id: p.kind, l: CHANGE_KIND_LABEL[p.kind], done: p.done, total: p.total })),
+                      ].map((x) => (
+                        <div key={x.id} data-overview-change-part={x.id}
+                          style={{ display: "flex", gap: 8, marginTop: 2 }}>
+                          <span style={{ flex: 1 }}>· {x.l}</span>
+                          <span style={{ fontFamily: NUM, color: C.plum }}>{x.done}/{x.total}</span>
+                        </div>
+                      ))}
+                    </>
+                  ) : "Tỉ lệ chưa gồm phiếu thay đổi/sai lệch"}
                 </div>
               )}
             </div>
@@ -150,10 +171,18 @@ export default function Overview({ acts, setView, access }: {
           ? `trong đó ${mismatched.length} lệch pha`
           : "Không có vấn đề"} />
 
-      {/* Chỉ số BỔ SUNG từ phiếu Thay đổi / Sai lệch — không trộn vào tỉ lệ VMP. */}
-      <ChangeSummaryTiles state={changeSummary} year={currentBangkokYear}
-        clsFor={(kind) => (kind === "thay_doi" ? "b-tdoi" : "b-slech")}
-        onOpen={di(destinations.changes)} />
+      {/* Khối riêng cho phiếu Thay đổi / Sai lệch, có tiêu đề, để không lẫn
+          với các chỉ số của kế hoạch VMP ở hàng trên (09/11). */}
+      <section className="b-phieu vmp-phieu" data-overview-change-block
+        aria-labelledby="overview-phieu-title">
+        <h2 id="overview-phieu-title" className="vmp-phieu__title">
+          Phiếu thay đổi & sai lệch {currentBangkokYear}
+        </h2>
+        <div className="vmp-phieu__grid">
+          <ChangeSummaryTiles state={changeSummary} year={currentBangkokYear}
+            onOpen={di(destinations.changes)} />
+        </div>
+      </section>
 
       <div className="b-vali">
         <PrincessCommentary stats={{

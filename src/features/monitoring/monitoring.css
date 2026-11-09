@@ -218,8 +218,7 @@
     "k1"
     "k2"
     "k4"
-    "tdoi"
-    "slech"
+    "phieu"
     "vali"
     "wide"
     "sau";
@@ -232,7 +231,7 @@
       "hero hero"
       "k1   k2"
       "k4   k4"
-      "tdoi slech"
+      "phieu phieu"
       "vali vali"
       "wide wide"
       "sau  sau";
@@ -245,16 +244,29 @@
     grid-template-areas:
       "hero hero hero"
       "k1   k2   k4"
-      "tdoi tdoi slech"
+      "phieu phieu phieu"
       "vali vali vali"
       "wide wide wide"
       "sau  sau  sau";
   }
 }
 
-/* Chỉ số bổ sung: phiếu Thay đổi / Sai lệch (04/11/2026). */
-.vmp-bento > .b-tdoi  { grid-area: tdoi; align-self: stretch; }
-.vmp-bento > .b-slech { grid-area: slech; align-self: stretch; }
+/* Khối phiếu Thay đổi / Sai lệch (04/11/2026, gom thành khối riêng 09/11). */
+.vmp-bento > .b-phieu { grid-area: phieu; min-width: 0; }
+.vmp-phieu__title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--lp-plum);
+}
+.vmp-phieu__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+@media (min-width: 720px) {
+  .vmp-phieu__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 /* Alerts is a command center first, then a management view. */
 .alerts-page-shell {
@@ -267,7 +279,7 @@
 .alerts-page-shell .alerts-command {
   display: grid;
   min-width: 0;
-  gap: 14px;
+  gap: 16px;
 }
 
 .alerts-page-shell .alerts-command__hero,

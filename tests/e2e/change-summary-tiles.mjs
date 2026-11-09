@@ -112,7 +112,9 @@ try {
   assert.match(sl.text, /1\/1 đã xong · 1 chưa có hạn/);
   assert.ok(td.y >= k1, "thẻ Thay đổi phải nằm dưới hàng chỉ số đầu");
   assert.equal(Math.round(td.y), Math.round(sl.y), "hai thẻ cùng một hàng");
-  assert.ok(td.w > sl.w * 1.5, "thẻ Thay đổi chiếm 2/3 hàng, Sai lệch 1/3");
+  assert.ok(Math.abs(td.w - sl.w) <= 2, "hai thẻ rộng bằng nhau trong khối phiếu");
+  const khoi = await page.$eval("[data-overview-change-block]", (el) => el.textContent.replace(/\s+/g, " ").trim());
+  assert.match(khoi, new RegExp(`^Phiếu thay đổi & sai lệch ${YEAR}`), "khối phiếu phải có tiêu đề riêng");
 
   // 1b. Vòng năm: % = (VMP xong + phiếu xong) ÷ (VMP tổng + phiếu tổng).
   const vong = () => page.evaluate(() => ({
@@ -120,13 +122,20 @@ try {
     done: Number(document.querySelector('[data-overview-metric="completed"] [data-overview-value]')?.textContent),
     total: Number(document.querySelector("[data-overview-total]")?.getAttribute("data-overview-total")),
     note: document.querySelector("[data-overview-change-note]")?.textContent?.trim() ?? null,
+    parts: Object.fromEntries([...document.querySelectorAll("[data-overview-change-part]")]
+      .map((el) => [el.getAttribute("data-overview-change-part"), [...el.children].map((c) => c.textContent.trim()).join(" ")])),
   }));
   const v = await vong();
   console.log("Vòng năm:", v);
   assert.ok(v.total > 0, "giả lập phải có hạng mục VMP");
   assert.equal(v.rate, tyLe(v.done + PHIEU_GOP.done, v.total + PHIEU_GOP.total), "vòng năm chưa gộp phiếu đúng luật");
   assert.notEqual(v.rate, tyLe(v.done, v.total), "dữ liệu thử phải làm tỉ lệ gộp khác tỉ lệ gốc");
-  assert.equal(v.note, "Tỉ lệ gồm 3 phiếu thay đổi/sai lệch");
+  assert.match(v.note, /^Tỉ lệ gồm:/);
+  assert.equal(v.parts.vmp, `· Kế hoạch VMP ${v.done}/${v.total}`);
+  const [tdGop, slGop] = [v.parts.thay_doi, v.parts.sai_lech].map((t) => t?.match(/^· (?:Thay đổi|Sai lệch) (\d+)\/(\d+)$/));
+  assert.ok(tdGop && slGop, `thiếu dòng tách Thay đổi / Sai lệch: ${JSON.stringify(v.parts)}`);
+  assert.equal(Number(tdGop[2]) + Number(slGop[2]), PHIEU_GOP.total, "hai loại cộng lại phải bằng số phiếu đã gộp");
+  assert.equal(Number(tdGop[1]) + Number(slGop[1]), PHIEU_GOP.done);
 
   // 2. Bấm thẻ → màn Dữ liệu nguồn (nơi có tab Thay đổi / Sai lệch).
   await page.click('[data-overview-kpi="change-thay_doi"]');
