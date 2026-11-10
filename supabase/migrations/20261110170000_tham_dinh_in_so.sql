@@ -15,10 +15,36 @@
 --     (chấm bằng công thức cũ) thì chặn ký kiểm tra/duyệt, báo cần chấm lại.
 --     · record_sign_evaluation: NGUYÊN VĂN bản 20261021100000_tham_dinh_chan_du_lieu_sai.sql,
 --       chỉ chèn phép so sánh. KHÔNG tự chấm lại, KHÔNG ghi revision nào.
---       So bỏ source_context (định danh mẫu in/cấu hình) — chỉ so kết quả.
+--     · Chủ dự án chốt (10/11): CHỈ so KẾT LUẬN — overall, status từng biểu mẫu,
+--       status từng dòng, controls.status — qua cpc1_private.evaluation_verdicts.
+--       KHÔNG so chữ lỗi/cảnh báo, formula_version, values (result/print_result…).
+--     · Đợt còn mở (chấm lại được): "…cần chấm lại trước khi ký."; đợt đã đóng
+--       hoặc không thuộc đợt: "…Liên hệ Admin." 
 -- Giữ nguyên SECURITY DEFINER / search_path / quyền (CREATE OR REPLACE giữ ACL).
 -- =====================================================================
 begin;
+
+-- Kết luận của một kết quả chấm: overall, controls.status, và với mỗi biểu mẫu
+-- status + status từng dòng (dòng hơi là mảng theo lần đo; dòng khí là object).
+create function cpc1_private.evaluation_verdicts(ev jsonb)
+ returns jsonb
+ language sql
+ immutable
+ set search_path to ''
+as $function$
+select jsonb_build_object(
+ 'overall', ev->'overall',
+ 'controls', ev#>'{controls,status}',
+ 'forms', coalesce((
+  select jsonb_object_agg(f.key, jsonb_build_object('status', f.value->'status', 'rows', coalesce((
+   select jsonb_object_agg(r.key, case jsonb_typeof(r.value)
+     when 'array' then (select jsonb_agg(x.value->'status' order by x.n) from jsonb_array_elements(r.value) with ordinality x(value, n))
+     when 'object' then r.value->'status' end)
+   from jsonb_each(case when jsonb_typeof(f.value->'rows') = 'object' then f.value->'rows' else '{}'::jsonb end) r), '{}'::jsonb)))
+  from jsonb_each(case when jsonb_typeof(ev->'forms') = 'object' then ev->'forms' else '{}'::jsonb end) f
+  where jsonb_typeof(f.value) = 'object'), '{}'::jsonb))
+$function$;
+revoke all on function cpc1_private.evaluation_verdicts(jsonb) from public, anon, authenticated;
 
 -- In số: làm tròn `digits` chữ số; nếu số đã làm tròn bằng đúng ngưỡng mà số
 -- gốc khác ngưỡng thì tăng dần chữ số (tối đa 6) cho đến khi số in khác ngưỡng.
@@ -130,9 +156,13 @@ begin
   exception when others then
    ev:=ev||jsonb_build_object('recompute_error','Không tính lại được hồ sơ: '||sqlerrm);
   end;
-  -- C7 (10/11): PDF in kết quả đã lưu; khác kết quả tính lại thì không cho ký (không tự chấm lại).
-  if not ev?'recompute_error' and stored is not null and (ev-'source_context') is distinct from (stored-'source_context') then
-   ev:=ev||jsonb_build_object('recompute_error','Hồ sơ được chấm bằng công thức cũ — cần chấm lại trước khi ký.');
+  -- C7 (10/11): PDF in kết quả đã lưu; KẾT LUẬN khác kết quả tính lại thì không cho ký (không tự chấm lại).
+  if not ev?'recompute_error' and stored is not null
+     and cpc1_private.evaluation_verdicts(ev) is distinct from cpc1_private.evaluation_verdicts(stored) then
+   ev:=ev||jsonb_build_object('recompute_error',case
+     when has_item and exists(select 1 from cpc1_private.runs r where r.id=item.run_id and r.status='open')
+     then 'Hồ sơ được chấm bằng công thức cũ — cần chấm lại trước khi ký.'
+     else 'Kết luận đã lưu khác kết luận chấm lại theo công thức hiện hành. Liên hệ Admin.' end);
   end if;
  end if;
  -- scoped_evaluation trả ev||{…} nên giữ nguyên khoá recompute_error.

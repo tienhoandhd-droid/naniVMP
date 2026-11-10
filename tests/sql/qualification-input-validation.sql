@@ -13,23 +13,16 @@ grant usage on sequence t_kq_stt_seq to authenticated;
 create temp table t_ctx(k text primary key, v text);
 grant all on t_ctx to authenticated;
 
--- Admin thứ hai (người duyệt) — tổng hợp, chỉ trong giao dịch này.
-insert into public.vmp_email_cho_phep(email, ghi_chu)
-values ('sqltest-admin2@example.test', 'Synthetic SQL test only') on conflict do nothing;
-insert into auth.users(id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
-values ('a8210210-0000-4000-8000-000000000008', 'authenticated', 'authenticated', 'sqltest-admin2@example.test', 'not-used', '{}', '{}', now(), now())
-on conflict do nothing;
-insert into public.profiles(id, full_name, email, role, department, is_active)
-values ('a8210210-0000-4000-8000-000000000008', 'SQL test Admin 2', 'sqltest-admin2@example.test', 'admin', 'qa', true)
-on conflict (id) do update set role = excluded.role, is_active = true;
--- Admin 1 làm người ký kiểm tra (phải có trong danh sách QA phụ trách).
-insert into public.vmp_qa_phu_trach(performer_id, ghi_chu)
-select id, 'SQL test only' from public.vmp_performers where user_id = 'a8210210-0000-4000-8000-000000000001'
-on conflict do nothing;
+-- 10/11 (Đợt C): bản sao production không có tài khoản tổng hợp a8210210-… và trigger
+-- chan_dang_ky_la chặn tạo tài khoản lạ → đóng vai bằng tài khoản CÓ SẴN:
+--   1 = Admin 73522c12 (QA phụ trách, người ký kiểm tra)
+--   2 = Admin 32faba9b (tạo đợt, nhập liệu)
+--   8 = Admin 043b5826 (người duyệt, khác hai người trên)
 
 create function pg_temp.as_user(n integer) returns void language sql as $$
   select set_config('request.jwt.claims', jsonb_build_object(
-    'sub', 'a8210210-0000-4000-8000-00000000000' || n, 'role', 'authenticated', 'aal', 'aal2',
+    'sub', case n when 1 then '73522c12-d8ea-4d9d-9d76-aab963e0e823' when 2 then '32faba9b-7441-419e-afab-dbb452623b3e'
+                  when 8 then '043b5826-efa0-4bb9-bcae-0e5052e51122' end, 'role', 'authenticated', 'aal', 'aal2',
     'amr', jsonb_build_array(jsonb_build_object('method', 'password', 'timestamp', floor(extract(epoch from now()))::bigint)))::text, true);
   select null::void;
 $$;

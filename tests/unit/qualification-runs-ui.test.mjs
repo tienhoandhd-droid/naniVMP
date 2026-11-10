@@ -205,7 +205,7 @@ test('C3 (10/11): mỗi số liệu xu hướng mang ngày đo; thiếu ngày đ
   const row = (point, value, extra = {}) => ({ form: 'bm01', point_id: point, metric: 'p05', unit: 'hạt/m³', value, ...extra });
   const runs = [{ id: 'r1', status: 'closed', started_on: '2026-10-05' }, { id: 'r2', status: 'open', started_on: '2026-10-25' }];
   const history = [
-    { system: 'air', run_id: 'r1', period: '2026-10-01', trend: [row('A', 10, { measured_on: '2026-10-21' }), row('B', 20)] },
+    { system: 'air', run_id: 'r1', period: '2026-10-01', trend: [row('A', 10, { measured_on: '2026-10-21T08:30:00+07:00' }), row('B', 20)] },
     { system: 'air', run_id: 'r2', period: '2026-10-01', trend: [row('A', 30, { measured_on: '2026-10-26' })] },
   ];
   const closed = ui.closedTrendHistory(history, runs, 'air');

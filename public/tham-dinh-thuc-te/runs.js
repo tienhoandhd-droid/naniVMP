@@ -38,7 +38,7 @@
   const trendSeries = (history, system, form, point, metric, unit) => {
     const allMonths = history.map(h => h.period).filter(Boolean).sort();
     const candidates = history.filter(h => h.system === system)
-      .flatMap(h => (h.trend || []).map(row => ({ ...row, period: h.period, record_id:h.record_id, version:h.version, date: [row.measured_on, h.started_on, h.period].find(validDate) || null })))
+      .flatMap(h => (h.trend || []).map(row => ({ ...row, period: h.period, record_id:h.record_id, version:h.version, date: [row.measured_on, h.started_on, h.period].map(d => d == null ? d : String(d).slice(0, 10)).find(validDate) || null })))
       .filter(r => r.form === form && (!point || r.point_id === point) && r.metric === metric);
     const selectedUnit = unit ?? candidates[0]?.unit ?? '';
     const rows = candidates.filter(r => (r.unit || '') === selectedUnit);

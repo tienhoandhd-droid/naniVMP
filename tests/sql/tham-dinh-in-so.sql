@@ -1,6 +1,6 @@
 -- Đợt C rà soát 10/11 (migration 20261110170000):
 --  C4  PDF in thêm chữ số khi số làm tròn chạm ngưỡng; kết luận, công thức, tiêu chí giữ nguyên.
---  C7  Chặn ký khi kết quả đã lưu (PDF in) khác kết quả tính lại (dùng để ký).
+--  C7  Chặn ký khi KẾT LUẬN đã lưu (PDF in) khác kết luận tính lại (dùng để ký).
 -- Chạy trên BẢN SAO production; mọi thứ trong một giao dịch, ROLLBACK cuối.
 \set ON_ERROR_STOP on
 begin;
@@ -56,21 +56,45 @@ begin
   reset role;
   return r;
 end $$;
--- Hồ sơ khí nén 25a13f7f: sửa tay kết quả ĐÃ LƯU cho khác kết quả tính lại (giả lập chấm bằng công thức cũ).
-update public.cpc1_revisions v set evaluation = jsonb_set(v.evaluation, '{forms,bm01,rows}',
-  (select jsonb_object_agg(k, case when n = 1 then jsonb_set(x, '{values,print_result}', '"9.99"') else x end)
-   from (select k, x, row_number() over (order by k) n from jsonb_each(v.evaluation #> '{forms,bm01,rows}') e(k, x)) z))
-from public.cpc1_records r where r.id = '25a13f7f-1a2a-4605-b8d4-175cc76b985f' and v.record_id = r.id and v.version = r.version;
-select pg_temp.ok('C7-01 kết quả lưu khác tính lại → không ký được, báo cần chấm lại',
-  r->>'ok' = 'false' and r->>'error_code' = 'INVALID_DATA' and exists (select 1 from jsonb_array_elements(r->'issues') i
-    where i->>'rule' = 'evaluation_error' and strpos(i->>'reason', 'Hồ sơ được chấm bằng công thức cũ — cần chấm lại trước khi ký') > 0), r::text)
+-- Sửa tay kết quả ĐÃ LƯU của phiên bản hiện hành (giả lập chấm bằng công thức cũ). Chỉ trong giao dịch.
+create function pg_temp.sua_luu(p_rec uuid, p_path text[], p_val jsonb) returns void language sql as $$
+  update public.cpc1_revisions v set evaluation = jsonb_set(v.evaluation, p_path, p_val)
+  from public.cpc1_records r where r.id = p_rec and v.record_id = r.id and v.version = r.version $$;
+create function pg_temp.dong_dau(p_rec uuid, p_form text) returns text language sql as $$
+  select min(k) from public.cpc1_revisions v join public.cpc1_records r on r.id = v.record_id and v.version = r.version,
+    jsonb_object_keys(v.evaluation #> array['forms', p_form, 'rows']) k where r.id = p_rec $$;
+create function pg_temp.co_ly_do(r jsonb, p text) returns boolean language sql as $$
+  select r->>'ok' = 'false' and r->>'error_code' = 'INVALID_DATA' and exists (select 1 from jsonb_array_elements(r->'issues') i
+    where i->>'rule' = 'evaluation_error' and strpos(i->>'reason', p) > 0) $$;
+
+-- (a) Khí nén 25a13f7f (đợt đã đóng): chỉ khác số in / chữ cảnh báo / formula_version → kết luận giống → ký được.
+select pg_temp.sua_luu('25a13f7f-1a2a-4605-b8d4-175cc76b985f', array['forms','bm01','rows',pg_temp.dong_dau('25a13f7f-1a2a-4605-b8d4-175cc76b985f','bm01'),'values','print_result'], '"9.99"');
+select pg_temp.sua_luu('25a13f7f-1a2a-4605-b8d4-175cc76b985f', array['forms','bm01','rows',pg_temp.dong_dau('25a13f7f-1a2a-4605-b8d4-175cc76b985f','bm01'),'warnings'], '{"p05":"chữ cảnh báo cũ"}');
+select pg_temp.sua_luu('25a13f7f-1a2a-4605-b8d4-175cc76b985f', array['formula_version'], '"cu-thu"');
+select pg_temp.ok('C7-01 chỉ khác print_result / cảnh báo / formula_version → vẫn ký kiểm tra được', r->>'ok' = 'true', r::text)
 from (select pg_temp.ky('25a13f7f-1a2a-4605-b8d4-175cc76b985f') r) x;
-select pg_temp.ok('C7-02 không tự chấm lại: kết quả đã lưu giữ nguyên, không thêm phiên bản',
-  (select count(*) from public.cpc1_revisions v join public.cpc1_records r on r.id = v.record_id and v.version = r.version
-   where r.id = '25a13f7f-1a2a-4605-b8d4-175cc76b985f' and v.evaluation::text like '%"9.99"%') = 1
-  and (select version from public.cpc1_records where id = '25a13f7f-1a2a-4605-b8d4-175cc76b985f') = 3);
-select pg_temp.ok('C7-03 hồ sơ khớp (khí nén 8d8884e1) vẫn ký kiểm tra được', r->>'ok' = 'true', r::text)
+
+-- (b) Khí nén 8d8884e1, mở lại đợt trong giao dịch: status MỘT dòng khác → chặn, "cần chấm lại".
+update cpc1_private.runs set status = 'open', closed_at = null where id = (select run_id from cpc1_private.run_items where record_id = '8d8884e1-fd53-428a-be92-7badd79c513c');
+select pg_temp.sua_luu('8d8884e1-fd53-428a-be92-7badd79c513c', array['forms','bm01','rows',pg_temp.dong_dau('8d8884e1-fd53-428a-be92-7badd79c513c','bm01'),'status'], '"fail"');
+select pg_temp.ok('C7-02 đợt mở, khác status một dòng → không ký được, báo cần chấm lại',
+  pg_temp.co_ly_do(r, 'Hồ sơ được chấm bằng công thức cũ — cần chấm lại trước khi ký.'), r::text)
 from (select pg_temp.ky('8d8884e1-fd53-428a-be92-7badd79c513c') r) x;
+select pg_temp.ok('C7-03 không tự chấm lại: kết quả đã lưu giữ nguyên, không thêm phiên bản',
+  (select v.evaluation #>> array['forms','bm01','rows',pg_temp.dong_dau(r.id,'bm01'),'status'] from public.cpc1_records r
+   join public.cpc1_revisions v on v.record_id = r.id and v.version = r.version where r.id = '8d8884e1-fd53-428a-be92-7badd79c513c') = 'fail'
+  and (select version from public.cpc1_records where id = '8d8884e1-fd53-428a-be92-7badd79c513c') = 3);
+
+-- (c) Nitơ 1760d54a (đợt đã đóng, không chấm lại được): khác overall → chặn, "Liên hệ Admin".
+select pg_temp.sua_luu('1760d54a-d935-4499-ba12-333e0562a778', array['overall'], '"fail"');
+select pg_temp.ok('C7-04 đợt đã đóng, khác kết luận → không ký được, báo Liên hệ Admin',
+  pg_temp.co_ly_do(r, 'Kết luận đã lưu khác kết luận chấm lại theo công thức hiện hành. Liên hệ Admin.'), r::text)
+from (select pg_temp.ky('1760d54a-d935-4499-ba12-333e0562a778') r) x;
+select pg_temp.ok('C7-05 evaluation_verdicts bỏ qua values/errors/warnings/formula_version, giữ status',
+  cpc1_private.evaluation_verdicts('{"overall":"pass","formula_version":"a","forms":{"bm01":{"status":"pass","rows":{"P1":[{"status":"pass","values":{"result":"1"},"errors":{}}]}}}}')
+  = cpc1_private.evaluation_verdicts('{"overall":"pass","formula_version":"b","forms":{"bm01":{"status":"pass","rows":{"P1":[{"status":"pass","values":{"result":"2"},"errors":{"x":"y"},"warnings":{"t3":"z"}}]}}}}')
+  and cpc1_private.evaluation_verdicts('{"overall":"pass","controls":{"status":"pass"},"forms":{}}')
+  <> cpc1_private.evaluation_verdicts('{"overall":"pass","controls":{"status":"fail"},"forms":{}}'));
 
 do $$
 declare n_fail int; n_all int;
