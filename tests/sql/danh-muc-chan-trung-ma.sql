@@ -4,10 +4,15 @@
 -- Lỗi gốc: rpc_save_catalog_object__five_role_impl_20260824 coi "tìm thấy
 -- bản ghi + không gửi version" là sửa bình thường, nên form "Thêm mới" gõ
 -- trùng mã sẽ thay tên/thuộc tính của đối tượng đang có.
--- Chạy trên bản sao production, trong một giao dịch rồi ROLLBACK.
+-- CHỈ chạy trên bản sao production (dựa vào đối tượng HT-15 và dữ liệu có sẵn),
+-- trong một giao dịch rồi ROLLBACK.
 -- =====================================================================
 begin;
 set local lock_timeout = '5s';
+select set_config('request.jwt.claims', json_build_object('role','authenticated','sub',(
+  select p.id::text from public.profiles p
+  where public.vmp_business_role(p.id) = 'admin' and p.is_active
+  order by p.id limit 1))::text, true);
 select set_config('request.jwt.claim.sub', (
   select p.id::text from public.profiles p
   where public.vmp_business_role(p.id) = 'admin' and p.is_active
@@ -75,6 +80,21 @@ begin
   assert v->>'error_code' = 'OBJECT_EXISTS', 'A1 ca5: tạo lại phải OBJECT_EXISTS, thấy: ' || v::text;
   assert (select object_name from public.vmp_source_objects where object_code = 'ZZA1-MOI')
        = 'Thiết bị thử A1', 'A1 ca5: tên bị ghi đè';
+end $$;
+
+-- Ca 6: luồng service (role service_role) sửa đối tượng có sẵn, version null
+-- -> KHÔNG bị OBJECT_EXISTS (vẫn đi tiếp bước kiểm sau, ở đây là ghi thành công).
+select set_config('request.jwt.claims', json_build_object('role','service_role','sub',
+  (select admin_id from (select p.id::text admin_id from public.profiles p
+    where public.vmp_business_role(p.id)='admin' and p.is_active order by p.id limit 1) a))::text, true);
+insert into kq select 'service', public.rpc_save_catalog_object(
+  t.object_kind, t.object_code, '{"note":"A1 test service"}'::jsonb,
+  'Test: service version null', null) from truoc t;
+do $$
+declare v jsonb := (select res from kq where buoc = 'service');
+begin
+  assert coalesce(v->>'error_code','') <> 'OBJECT_EXISTS',
+    'A1 ca6: service_role không được bị chặn OBJECT_EXISTS, thấy: ' || v::text;
 end $$;
 
 select 'A1 PASS' as ket_qua;

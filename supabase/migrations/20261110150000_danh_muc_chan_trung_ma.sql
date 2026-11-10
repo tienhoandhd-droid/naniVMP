@@ -80,7 +80,10 @@ begin
 
   -- A1 (10/11/2026): thêm mới mà trùng mã thì báo lỗi, không ghi đè. Sửa bản
   -- ghi đã có luôn phải gửi version; không gửi version coi như "thêm mới".
-  if not v_created and p_expected_version is null then
+  -- Chỉ áp cho người dùng web (role authenticated); luồng service như
+  -- rpc_upsert_source_object luôn gọi với version null nên không bị chặn.
+  if not v_created and p_expected_version is null
+     and coalesce(auth.role(),'')='authenticated' then
     return jsonb_build_object('ok',false,'error_code','OBJECT_EXISTS',
       'error','Mã '||p_object_code||' đã có trong Danh mục. Mở đối tượng đó để sửa.',
       'current_version',v_source.version);
@@ -417,6 +420,13 @@ begin
     );
   else
     v_old:=to_jsonb(v_existing);
+    -- A2: thu hồi chỉ đổi is_active; giữ nguyên người và phạm vi đã cấp.
+    if not p_is_active then
+      p_performer_id:=v_existing.performer_id;
+      v_department:=v_existing.department;
+      v_area:=v_existing.area_code;
+      v_line:=v_existing.line;
+    end if;
     update public.vmp_source_workshop_scope_grants grant_row
     set performer_id=p_performer_id,department=v_department,
         department_key=public.vmp_source_scope_key(v_department),

@@ -5,7 +5,8 @@
 -- (khu vực còn đối tượng hoạt động) và PERSON_NOT_ELIGIBLE (người còn
 -- hoạt động) cả khi p_is_active = false. Ngừng hết đối tượng của khu vực
 -- hoặc khoá tài khoản xong thì không thu hồi được phạm vi đã cấp.
--- Chạy trên bản sao production, trong một giao dịch rồi ROLLBACK.
+-- CHỈ chạy trên bản sao production (dựa vào UUID người xưởng có sẵn),
+-- trong một giao dịch rồi ROLLBACK.
 -- =====================================================================
 begin;
 set local lock_timeout = '5s';
@@ -82,6 +83,23 @@ begin
     'A2 ca2: thu hồi khi tài khoản khoá phải đạt, thấy: '||v::text;
 end $$;
 
+-- Ca 2b: thu hồi KHÔNG được đổi người/phạm vi đã cấp, dù client gửi giá trị khác.
+insert into kq select 'cap_3', public.rpc_set_source_workshop_scope_grant(
+  null,(select pf_a from nguoi),'ZZA2_DEPT','ZZA2_AREA2',null,true,'Test: cấp 3',null);
+insert into kq select 'thu_3', public.rpc_set_source_workshop_scope_grant(
+  (select (res->>'grant_id')::uuid from kq where buoc='cap_3'),(select pf_b from nguoi),
+  'KHAC','KHU_KHAC','LINE_KHAC',false,'Test: thu hồi gửi giá trị khác',
+  (select (res->>'version')::int from kq where buoc='cap_3'));
+do $$
+declare v jsonb := (select res from kq where buoc='thu_3'); g record;
+begin
+  assert v->>'ok'='true', 'A2 ca2b: thu hồi phải đạt, thấy: '||v::text;
+  select * into g from public.vmp_source_workshop_scope_grants where id=(v->>'grant_id')::uuid;
+  assert g.performer_id=(select pf_a from nguoi) and g.department='ZZA2_DEPT'
+     and g.area_code='ZZA2_AREA2' and g.line is null and not g.is_active,
+    'A2 ca2b: thu hồi làm đổi người/phạm vi: '||to_jsonb(g)::text;
+end $$;
+
 -- Ca 3: cấp mới vẫn bị chặn như cũ.
 insert into kq select 'cap_khu_vuc_het', public.rpc_set_source_workshop_scope_grant(
   null,(select pf_a from nguoi),'ZZA2_DEPT','ZZA2_AREA1',null,true,'Test: cấp vào khu vực hết đối tượng',null);
@@ -100,15 +118,15 @@ insert into kq select 'thu_thieu_ly_do', public.rpc_set_source_workshop_scope_gr
   (select (res->>'grant_id')::uuid from kq where buoc='cap_1'),(select pf_a from nguoi),
   'ZZA2_DEPT','ZZA2_AREA1',null,false,'',
   (select (res->>'version')::int from kq where buoc='thu_1'));
-insert into kq select 'thu_sai_version', public.rpc_set_source_workshop_scope_grant(
+insert into kq select 'thu_thieu_version', public.rpc_set_source_workshop_scope_grant(
   (select (res->>'grant_id')::uuid from kq where buoc='cap_1'),(select pf_a from nguoi),
   'ZZA2_DEPT','ZZA2_AREA1',null,false,'Test: sai version',null);
 do $$
 begin
   assert (select res->>'error_code' from kq where buoc='thu_thieu_ly_do')='REASON_REQUIRED',
     'A2 ca4a: thiếu lý do phải REASON_REQUIRED';
-  assert (select res->>'error_code' from kq where buoc='thu_sai_version')='VERSION_CONFLICT',
-    'A2 ca4b: thiếu version phải VERSION_CONFLICT, thấy: '||(select res::text from kq where buoc='thu_sai_version');
+  assert (select res->>'error_code' from kq where buoc='thu_thieu_version')='VERSION_CONFLICT',
+    'A2 ca4b: thiếu version phải VERSION_CONFLICT, thấy: '||(select res::text from kq where buoc='thu_thieu_version');
 end $$;
 
 select 'A2 PASS' as ket_qua;
