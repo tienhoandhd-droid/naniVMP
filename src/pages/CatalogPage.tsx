@@ -11,12 +11,13 @@ import { useEffect, useMemo, useState } from "react";
 import "../features/catalog/catalog.css"; // B5: CSS theo route
 import { Boxes, Search, Pencil, ChevronRight, Layers, ExternalLink, SlidersHorizontal, X } from "lucide-react";
 import { C, TEXT, NUM, btnPrimary, INP } from "../constants/theme.ts";
-import { CLS, DEPTS } from "../constants/vmp.ts";
+import { CLS, DEPTS, vmpToday } from "../constants/vmp.ts";
 import { parseD, fmtVN, txt, wlIsDone } from "../utils/helpers.ts";
 import { Card, Tag, Pill, PhanTrang } from "../components/ui/Primitives.tsx";
 import ProgressEditModal from "../components/dashboard/ProgressEditModal.tsx";
 import KhongThamDinhCard from "../components/catalog/KhongThamDinhCard.tsx";
 import { progressValidationCode } from "../features/progress/editableProgressRights.ts";
+import { isVmpComplete } from "../lib/vmpDeadlineModel.ts";
 import { useDebounce } from "../hooks/index.ts";
 import type { Activity, VmpObject } from "../types/domain.ts";
 
@@ -75,8 +76,9 @@ function OMoc({ raw, dlKey, ngayKey, ttKey }: {
 }) {
   const dl = parseD(raw[dlKey] as string);
   const ngay = parseD(raw[ngayKey] as string);
-  const xong = wlIsDone(raw[ttKey]);
-  const tre = !xong && dl && dl < new Date(new Date().setHours(0, 0, 0, 0));
+  // Đích VMP dùng định nghĩa chung: trạng thái Hoàn thành HOẶC có ngày VMP thực tế.
+  const xong = ttKey === "tt_vmp" ? isVmpComplete({ _raw: raw } as unknown as Activity) : wlIsDone(raw[ttKey]);
+  const tre = !xong && dl && dl < vmpToday();
   const mau = xong ? C.mintText : tre ? C.raspText : C.plumSoft;
   const nen = xong ? C.mintSoft : tre ? C.raspSoft : C.pinkMist;
   return (

@@ -101,6 +101,69 @@ begin
     v_ca.obj_code, v_extra->'_raw'->'support_person_ids';
 end $$;
 
+-- ---------- Fix round 1 (Minor 1): support_person_ids chỉ đầy đủ cho admin/qa_manager ----------
+-- QA thường: chỉ thấy id của chính mình; vai xưởng: không thấy id người khác.
+do $$
+declare
+  v_ca ca;
+  v_extra jsonb;
+  v_bad int;
+begin
+  select * into v_ca from ca;
+  select a into v_extra from jsonb_array_elements((select payload->'activities' from dash)) a
+   where a->>'code' = v_ca.obj_code limit 1;
+  assert v_extra->'_raw'->'support_person_ids' = jsonb_build_array(v_ca.qa_pid),
+    'R1-M1: qa_staff chỉ được thấy id của chính mình, thấy: '
+      || coalesce((v_extra->'_raw'->'support_person_ids')::text, 'null');
+  select count(*) into v_bad
+    from jsonb_array_elements((select payload->'activities' from dash)) a,
+         jsonb_array_elements_text(coalesce(a->'_raw'->'support_person_ids', '[]')) x(id)
+   where x.id <> v_ca.qa_pid::text;
+  assert v_bad = 0, format('R1-M1: qa_staff thấy %s id người hỗ trợ khác', v_bad);
+  raise notice 'R1-M1 GREEN qa_staff: chỉ thấy id của mình';
+end $$;
+
+create temp table dash_xuong on commit drop as
+  select p.id uid, null::jsonb payload from public.profiles p
+   where p.is_active and public.vmp_business_role(p.id) in ('workshop_manager', 'workshop_staff')
+     and public.vmp_is_active_session(p.id);
+do $$
+declare r record; v_payload jsonb; v_me text[]; v_bad int; v_so int := 0;
+begin
+  for r in select uid from dash_xuong loop
+    perform set_config('request.jwt.claims', json_build_object(
+      'sub', r.uid, 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    v_payload := public.rpc_get_vmp_dashboard(2026);
+    select coalesce(array_agg(pf.id::text), '{}') into v_me
+      from public.vmp_performers pf where pf.user_id = r.uid;
+    select count(*) into v_bad
+      from jsonb_array_elements(coalesce(v_payload->'activities', '[]')) a,
+           jsonb_array_elements_text(coalesce(a->'_raw'->'support_person_ids', '[]')) x(id)
+     where not (x.id = any(v_me));
+    assert v_bad = 0, format('R1-M1: vai xưởng %s thấy %s id người hỗ trợ khác', r.uid, v_bad);
+    v_so := v_so + jsonb_array_length(coalesce(v_payload->'activities', '[]'));
+  end loop;
+  assert (select count(*) from dash_xuong) > 0, 'R1-M1: bản sao không có tài khoản xưởng';
+  raise notice 'R1-M1 GREEN xưởng: % tài khoản, % hạng mục, không lộ id', (select count(*) from dash_xuong), v_so;
+end $$;
+
+-- Admin vẫn thấy đủ (người hỗ trợ chính + QA hỗ trợ thêm).
+select set_config('request.jwt.claims', json_build_object(
+  'sub', (select admin_uid from ca), 'role', 'authenticated', 'aal', 'aal2')::text, true);
+do $$
+declare v_ca ca; v_a jsonb; v_main uuid;
+begin
+  select * into v_ca from ca;
+  select a into v_a from jsonb_array_elements(public.rpc_get_vmp_dashboard(2026)->'activities') a
+   where a->>'code' = v_ca.obj_code limit 1;
+  select i.support_person_id into v_main from public.vmp_plan_items i
+   where i.validation_code = v_a->>'validation_code' and i.year = 2026;
+  assert (v_a->'_raw'->'support_person_ids') ? v_ca.qa_pid::text
+     and (v_main is null or (v_a->'_raw'->'support_person_ids') ? v_main::text),
+    'R1-M1: admin phải thấy đủ người hỗ trợ, thấy: ' || coalesce((v_a->'_raw'->'support_person_ids')::text, 'null');
+  raise notice 'R1-M1 GREEN admin: %', v_a->'_raw'->'support_person_ids';
+end $$;
+
 -- ---------- B3: tổng quan đếm "hoàn thành" cả mục có ngày hoàn thành ----------
 update ca set item_id = (
   select i.id from public.vmp_plan_items i
@@ -113,6 +176,8 @@ update ca set item_id = (
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 create temp table tq(buoc text, vai text, res jsonb) on commit drop;
 insert into tq select 'truoc', 'service', public.rpc_team_overview_summary(2026);
+create temp table kpi on commit drop as
+  select 'truoc'::text buoc, public.rpc_dashboard_kpi(2026) res;
 select set_config('request.jwt.claims', json_build_object(
   'sub', (select admin_uid from ca), 'role', 'authenticated', 'aal', 'aal2')::text, true);
 insert into tq select 'truoc', 'admin', public.rpc_team_overview_summary(2026);
@@ -124,6 +189,7 @@ update public.vmp_plan_items
        deadline_vmp = date '2026-10-01'
  where id = (select item_id from ca);
 insert into tq select 'sau', 'service', public.rpc_team_overview_summary(2026);
+insert into kpi select 'sau', public.rpc_dashboard_kpi(2026);
 select set_config('request.jwt.claims', json_build_object(
   'sub', (select admin_uid from ca), 'role', 'authenticated', 'aal', 'aal2')::text, true);
 insert into tq select 'sau', 'admin', public.rpc_team_overview_summary(2026);
@@ -145,6 +211,41 @@ begin
   assert cardinality(v_loi) = 0,
     'B3: mục có actual_vmp_date phải tính là xong — ' || array_to_string(v_loi, '; ');
   raise notice 'B3 GREEN: %', (select jsonb_object_agg(buoc || '_' || vai, res->'completed') from tq);
+end $$;
+
+-- ---------- Fix round 1: mục có actual_vmp_date là XONG ở cảnh báo, computed_status, KPI ----------
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_item public.vmp_plan_items;
+  v_code text := (select validation_code from public.vmp_plan_items where id = (select item_id from ca));
+  v_loi text[] := '{}';
+  v_truoc jsonb := (select res from kpi where buoc = 'truoc');
+  v_sau jsonb := (select res from kpi where buoc = 'sau');
+begin
+  -- (1) rpc_due_alerts không còn cảnh báo hạng mục đã có ngày VMP thực tế.
+  if exists (select 1 from jsonb_array_elements(public.rpc_due_alerts(2026, 7)) a
+              where a->>'validation_code' = v_code) then
+    v_loi := v_loi || format('rpc_due_alerts vẫn cảnh báo %s dù đã có actual_vmp_date', v_code);
+  end if;
+  -- (2) compute_item_status_v2 trả 'done' như khi status_vmp completed.
+  v_item := jsonb_populate_record(null::public.vmp_plan_items, jsonb_build_object(
+    'status_vmp', 'in_progress', 'actual_vmp_date', '2026-09-28', 'deadline_vmp', '2026-10-01'));
+  if public.compute_item_status_v2(v_item) <> 'done' then
+    v_loi := v_loi || format('compute_item_status_v2 ra %s', public.compute_item_status_v2(v_item));
+  end if;
+  if (select computed_status::text from public.vmp_plan_items where id = (select item_id from ca)) <> 'done' then
+    v_loi := v_loi || format('computed_status sau khi ghi là %s',
+      (select computed_status::text from public.vmp_plan_items where id = (select item_id from ca)));
+  end if;
+  -- (4) rpc_dashboard_kpi đếm mục này là xong.
+  if (v_sau->'validation'->>'done')::int <> (v_truoc->'validation'->>'done')::int + 1 then
+    v_loi := v_loi || format('rpc_dashboard_kpi done trước %s, sau %s',
+      v_truoc->'validation'->>'done', v_sau->'validation'->>'done');
+  end if;
+  assert cardinality(v_loi) = 0, 'R1: ' || array_to_string(v_loi, '; ');
+  raise notice 'R1 GREEN: cảnh báo bỏ %, computed_status done, KPI done % → %', v_code,
+    v_truoc->'validation'->>'done', v_sau->'validation'->>'done';
 end $$;
 
 -- ---------- B5: "hôm nay" theo giờ VN dù phiên ở múi giờ khác ----------
@@ -194,6 +295,27 @@ begin
       v_bad, jsonb_array_length(v_alerts), current_date, v_vn);
   raise notice 'B5 GREEN rpc_due_alerts: VN=% phiên=% cảnh báo=%', v_vn, current_date, jsonb_array_length(v_alerts);
 end $$;
+do $$
+declare
+  v_vn date := (now() at time zone 'Asia/Bangkok')::date;
+  v_kpi jsonb := public.rpc_dashboard_kpi(2026);
+  v_ky record;
+begin
+  select count(*) filter (where status_vmp = 'completed' or actual_vmp_date is not null) n_done,
+         count(*) filter (where not (status_vmp = 'completed' or actual_vmp_date is not null)
+                            and deadline_vmp < v_vn) n_over,
+         count(*) filter (where not is_doc_complete and deadline_report < v_vn) n_doc_over,
+         count(*) n_total
+    into v_ky
+    from public.vmp_plan_items where year = 2026 and is_active;
+  assert (v_kpi->'validation'->>'done')::int = v_ky.n_done
+     and (v_kpi->'validation'->>'over')::int = v_ky.n_over
+     and (v_kpi->'validation'->>'todo')::int = v_ky.n_total - v_ky.n_done - v_ky.n_over
+     and (v_kpi->'documentation'->>'over')::int = v_ky.n_doc_over,
+    format('R1: rpc_dashboard_kpi lệch định nghĩa chung (VN %s, phiên %s): KPI %s, kỳ vọng done=%s over=%s doc_over=%s',
+      v_vn, current_date, v_kpi, v_ky.n_done, v_ky.n_over, v_ky.n_doc_over);
+  raise notice 'R1 GREEN rpc_dashboard_kpi: %', v_kpi->'validation';
+end $$;
 reset timezone;
 
 -- Quyền thực thi giữ nguyên.
@@ -206,10 +328,13 @@ do $$ begin
        = '{postgres=X/postgres,service_role=X/postgres}', 'ACL compute_item_status_v2 đổi';
   assert (select proacl::text from pg_proc where oid = 'public.rpc_due_alerts__five_role_impl_20260824(integer,integer)'::regprocedure)
        = '{postgres=X/postgres}', 'ACL rpc_due_alerts impl đổi';
+  assert (select proacl::text from pg_proc where oid = 'public.rpc_dashboard_kpi__five_role_impl_20260824(integer)'::regprocedure)
+       = '{postgres=X/postgres}', 'ACL rpc_dashboard_kpi impl đổi';
   assert (select bool_and(prosecdef) from pg_proc where oid in (
     'public.rpc_get_vmp_dashboard(integer,boolean,boolean)'::regprocedure,
     'public.rpc_team_overview_summary(integer)'::regprocedure,
-    'public.rpc_due_alerts__five_role_impl_20260824(integer,integer)'::regprocedure)),
+    'public.rpc_due_alerts__five_role_impl_20260824(integer,integer)'::regprocedure,
+    'public.rpc_dashboard_kpi__five_role_impl_20260824(integer)'::regprocedure)),
     'SECURITY DEFINER bị mất';
   raise notice 'ACL/SECURITY DEFINER giữ nguyên';
 end $$;

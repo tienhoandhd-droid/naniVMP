@@ -7,11 +7,17 @@
 -- OR REPLACE giữ nguyên quyền GRANT. Không đổi bảng hay dữ liệu.
 --
 -- B1  rpc_get_vmp_dashboard: _raw thêm support_person_id và
---     support_person_ids (người hỗ trợ chính + QA hỗ trợ thêm theo đối tượng).
--- B3  rpc_team_overview_summary: hoàn thành = status_vmp completed HOẶC có
---     actual_vmp_date (định nghĩa chốt 07/11).
+--     support_person_ids (người hỗ trợ chính + QA hỗ trợ thêm theo đối tượng;
+--     đủ danh sách chỉ cho admin/qa_manager/service_role, vai khác chỉ id mình).
+-- B3  Hoàn thành = status_vmp completed HOẶC có actual_vmp_date (chốt 07/11):
+--     rpc_team_overview_summary, compute_item_status_v2 ('done'),
+--     rpc_due_alerts__five_role_impl_20260824 (không cảnh báo mục đã xong),
+--     rpc_dashboard_kpi__five_role_impl_20260824 (tính trực tiếp, bỏ đọc
+--     computed_status đã lưu).
 -- B5  compute_item_status_v2, rpc_due_alerts__five_role_impl_20260824 (phần
---     tính của rpc_due_alerts): CURRENT_DATE → ngày theo Asia/Bangkok.
+--     tính của rpc_due_alerts), rpc_dashboard_kpi__five_role_impl_20260824:
+--     CURRENT_DATE → ngày theo Asia/Bangkok.
+-- Không sửa: rpc_ai_* (trợ lý Vali cũ, chờ tắt), rpc_refresh_computed_status.
 -- Test: tests/sql/dashboard-nguoi-ho-tro.sql
 -- =====================================================================
 
@@ -30,7 +36,14 @@ begin
     return public.vmp_session_denial();
   end if;
 
-  with visible_source as materialized (
+  with viewer as materialized (
+    -- B1 (10/11): ai được xem đủ danh sách người hỗ trợ; vai khác chỉ thấy id của mình.
+    select (coalesce(auth.role(),'')='service_role'
+            or public.vmp_business_role(auth.uid()) in ('admin','qa_manager')) full_view,
+           coalesce(array(select performer.id from public.vmp_performers performer
+                           where performer.user_id=auth.uid() and performer.is_active),
+                    array[]::uuid[]) me_ids
+  ), visible_source as materialized (
     select source_object.*,master_object.name master_name,
            master_object.classification master_classification,
            master_object.department master_department
@@ -115,7 +128,8 @@ begin
         'loai_td',item.validation_type,'qa',item.owner_name,
         'owner_person_id',item.owner_person_id,
         -- B1 (10/11): người hỗ trợ chính + QA hỗ trợ thêm của đối tượng,
-        -- để màn Hôm nay/Tổng quan nhận ra hạng mục "của tôi".
+        -- để màn Hôm nay/Tổng quan nhận ra hạng mục "của tôi". Đủ danh sách
+        -- chỉ cho admin/qa_manager/service_role; vai khác chỉ nhận id của mình.
         'support_person_id',item.support_person_id,
         'support_person_ids',coalesce((select jsonb_agg(person.id order by person.id)
           from (select item.support_person_id id
@@ -123,7 +137,8 @@ begin
                 union
                 select extra.performer_id
                   from public.vmp_source_supporters extra
-                 where extra.source_object_id=item.source_object_id) person),
+                 where extra.source_object_id=item.source_object_id) person, viewer
+          where viewer.full_view or person.id=any(viewer.me_ids)),
           '[]'::jsonb),
         'email_qa',(select performer.email
           from public.vmp_performers performer
@@ -253,7 +268,8 @@ DECLARE
   v_today DATE := (now() at time zone 'Asia/Bangkok')::date;
   v_deadline DATE := item.deadline_vmp;
 BEGIN
-  IF item.status_vmp = 'completed' THEN
+  -- B3 (10/11): hoàn thành = trạng thái completed HOẶC có ngày VMP thực tế.
+  IF item.status_vmp = 'completed' OR item.actual_vmp_date IS NOT NULL THEN
     RETURN 'done';
   END IF;
   IF v_deadline IS NOT NULL AND v_deadline < v_today THEN
@@ -311,6 +327,8 @@ BEGIN
         ) AS s(stage, due_date, st)
         WHERE s.due_date IS NOT NULL
           AND s.st <> 'completed'
+          -- B3 (10/11): có ngày VMP thực tế thì mốc VMP đã xong.
+          AND NOT (s.stage = 'VMP' AND pi.actual_vmp_date IS NOT NULL)
         ORDER BY s.due_date ASC
         LIMIT 1
       ) st
@@ -318,6 +336,8 @@ BEGIN
         AND COALESCE(pi.missing_from_sheet, FALSE) = FALSE
         AND o.is_active = TRUE
         AND pi.status_vmp <> 'completed'
+        -- B3 (10/11): hạng mục đã có ngày VMP thực tế là hoàn thành, không cảnh báo.
+        AND pi.actual_vmp_date IS NULL
         -- S1-F FIX: không gửi cảnh báo cho mã Không áp dụng / Đã hủy
         AND COALESCE(pi.item_state, 'active') = 'active'
         -- S2-H FIX: chấp nhận hạng mục năm hiện tại HOẶC deadline cross-year
@@ -325,5 +345,54 @@ BEGIN
         AND st.due_date <= v_today + p_soon_days
     ) q
   ), '[]'::jsonb);
+END;
+$function$;
+
+-- B3/B5 (fix 10/11): KPI máy chủ (màn Kiểm tra máy chủ / Sức khoẻ gọi rpc_dashboard_kpi)
+CREATE OR REPLACE FUNCTION public.rpc_dashboard_kpi__five_role_impl_20260824(p_year integer DEFAULT (EXTRACT(year FROM now()))::integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+    result JSONB;
+    -- B5 (10/11): hôm nay theo giờ VN, không theo múi giờ phiên (production UTC).
+    v_today DATE := (now() at time zone 'Asia/Bangkok')::date;
+BEGIN
+    WITH items AS (
+        SELECT * FROM public.vmp_visible_plan_items() WHERE year = p_year AND is_active = TRUE
+    ),
+    val_stats AS (
+        SELECT
+            -- B3 (10/11): định nghĩa chung, tính trực tiếp thay vì đọc
+            -- computed_status đã lưu (cột này chỉ đổi khi hạng mục được ghi).
+            -- Hoàn thành = completed HOẶC có ngày VMP thực tế; quá hạn = chưa
+            -- hoàn thành VÀ hạn VMP < hôm nay giờ VN.
+            COUNT(*) FILTER (WHERE status_vmp = 'completed' OR actual_vmp_date IS NOT NULL) AS done,
+            COUNT(*) FILTER (WHERE NOT (status_vmp = 'completed' OR actual_vmp_date IS NOT NULL)
+                               AND deadline_vmp < v_today) AS over,
+            COUNT(*) FILTER (WHERE NOT (status_vmp = 'completed' OR actual_vmp_date IS NOT NULL)
+                               AND (deadline_vmp IS NULL OR deadline_vmp >= v_today)) AS todo,
+            COUNT(*) AS total
+        FROM items
+    ),
+    doc_stats AS (
+        SELECT
+            COUNT(*) FILTER (WHERE is_doc_complete = TRUE) AS done,
+            COUNT(*) FILTER (WHERE NOT is_doc_complete AND deadline_report < v_today) AS over,
+            COUNT(*) - COUNT(*) FILTER (WHERE is_doc_complete = TRUE)
+                     - COUNT(*) FILTER (WHERE NOT is_doc_complete AND deadline_report < v_today) AS todo,
+            COUNT(*) AS total
+        FROM items
+    )
+    SELECT jsonb_build_object(
+        'validation', (SELECT row_to_json(val_stats.*) FROM val_stats),
+        'documentation', (SELECT row_to_json(doc_stats.*) FROM doc_stats),
+        'mismatch_count', (SELECT COUNT(*) FROM items WHERE has_mismatch IS NOT NULL),
+        'updated_at', NOW()
+    ) INTO result;
+
+    RETURN result;
 END;
 $function$;
