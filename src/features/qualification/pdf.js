@@ -49,9 +49,20 @@ function wrap(text,font,size,width){
     for(const word of words){const c=line?`${line} ${word}`:word;if(font.widthOfTextAtSize(c,size)<=width)line=c;else if(!line||font.widthOfTextAtSize(word,size)>width)return null;else{out.push(line);line=word;}}out.push(line);}
   return out;
 }
-function drawText(page,op,text,font){
-  if(!text)return;const b=box(page,op.rect),size=op.size,pad=op.padding??2,inner={x:b.x+pad,y:b.y+pad,width:b.width-2*pad,height:b.height-2*pad};
-  const lines=wrap(text,font,size,inner.width),lh=size*(op.lineSpacing??115)/100;if(!lines||lines.length*lh>inner.height)throw new Error(`Nội dung không vừa ô PDF ở cỡ chữ gốc ${size}: ${text.slice(0,80)}`);
+// C4 vòng 2 (10/11): số kết quả in thêm chữ số khi chạm ngưỡng (print_num) có thể dài hơn ô
+// (vd. "0.9495" ở ô BM03). CHỈ ô số kết quả được co chữ từng bước 0,5 pt, tối thiểu 75% cỡ gốc;
+// ô khác giữ cỡ gốc. Không vừa thì trả null → báo lỗi như cũ. Không đổi print-layout.json.
+export const resultMinScale=source=>source?.type==='computed'&&source?.key==='result'?0.75:1;
+export function fitTextSize(text,font,op,inner,minScale=1,spacing=115){
+  for(let size=op.size;size>=op.size*minScale-1e-9;size-=0.5){
+    const lines=wrap(text,font,size,inner.width),lh=size*(op.lineSpacing??spacing)/100;
+    if(lines&&lines.length*lh<=inner.height)return {size,lines,lh};
+  }
+  return null;
+}
+function drawText(page,op,text,font,minScale=1){
+  if(!text)return;const b=box(page,op.rect),pad=op.padding??2,inner={x:b.x+pad,y:b.y+pad,width:b.width-2*pad,height:b.height-2*pad};
+  const fit=fitTextSize(text,font,op,inner,minScale);if(!fit)throw new Error(`Nội dung không vừa ô PDF ở cỡ chữ gốc ${op.size}: ${text.slice(0,80)}`);const {size,lines,lh}=fit;
   let y=op.baseline!=null?page.getHeight()-op.baseline:op.valign==='top'?inner.y+inner.height-size:inner.y+(inner.height+lines.length*lh)/2-lh;const c=op.color||[0,0,0];
   for(const line of lines){const w=font.widthOfTextAtSize(line,size),x=op.align==='left'?inner.x:inner.x+(inner.width-w)/2;page.drawText(line,{x,y,size,font,color:rgb(c[0],c[1],c[2])});y-=lh;}
 }
@@ -71,6 +82,6 @@ export async function renderPdf(form,data,evaluation,assets){
   const pdf=await PDFDocument.load(assets.template,{updateMetadata:false});if(pdf.getPageCount()!==mapped.length)throw new Error('Số trang template không khớp print-layout');pdf.registerFontkit(fontkit);
   const needed=new Set();for(const p of mapped)for(const op of p.writes)if(op.kind==='text'&&value(data,evaluation,op.source))needed.add(op.fontKey);
   const fonts={};for(const key of needed){const bytes=assets.fonts?.[key];if(!(bytes instanceof Uint8Array))throw new TypeError(`Thiếu font exact: ${key}`);fonts[key]=await pdf.embedFont(bytes,{subset:true});}
-  const pages=pdf.getPages();mapped.forEach((mp,i)=>{for(const op of mp.writes){if(op.kind==='checkbox'){if(status(evaluation,op.source)!==op.checkedStatus)continue;const b=box(pages[i],op.rect);pages[i].drawLine({start:{x:b.x+.20*b.width,y:b.y+.58*b.height},end:{x:b.x+.45*b.width,y:b.y+.28*b.height},thickness:.8,color:rgb(0,0,0)});pages[i].drawLine({start:{x:b.x+.45*b.width,y:b.y+.28*b.height},end:{x:b.x+.82*b.width,y:b.y+.82*b.height},thickness:.8,color:rgb(0,0,0)});}else drawText(pages[i],op,value(data,evaluation,op.source),fonts[op.fontKey]);}});
+  const pages=pdf.getPages();mapped.forEach((mp,i)=>{for(const op of mp.writes){if(op.kind==='checkbox'){if(status(evaluation,op.source)!==op.checkedStatus)continue;const b=box(pages[i],op.rect);pages[i].drawLine({start:{x:b.x+.20*b.width,y:b.y+.58*b.height},end:{x:b.x+.45*b.width,y:b.y+.28*b.height},thickness:.8,color:rgb(0,0,0)});pages[i].drawLine({start:{x:b.x+.45*b.width,y:b.y+.28*b.height},end:{x:b.x+.82*b.width,y:b.y+.82*b.height},thickness:.8,color:rgb(0,0,0)});}else drawText(pages[i],op,value(data,evaluation,op.source),fonts[op.fontKey],resultMinScale(op.source));}});
   return pdf.save({useObjectStreams:false,addDefaultPage:false,updateFieldAppearances:false});
 }
