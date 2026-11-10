@@ -104,6 +104,25 @@ test("loại done đầy đủ, cancelled và not_applicable; done thiếu ngày
   assert.deepEqual(model.sections.incomplete[0].reasons.map((reason) => reason.kind), ["missing_actual_completion"]);
 });
 
+test("B4: giai đoạn có trạng thái Hoàn thành (dù thiếu ngày) không còn là giai đoạn chặn", () => {
+  const model = buildTodayActionModel([{
+    id: "V-DC-XONG", validationCode: "V-DC-XONG", st: "over", state: "active",
+    dlVmp: "2026-08-10", ownerPersonId: ID_A,
+    _raw: { tt_de_cuong: "completed", tt_tham_dinh: "in_progress" },
+  }], { now: HOM_NAY, rights: new Map(), rightsStatus: "ready" });
+  assert.equal(model.rows[0].blockingStage, "Thẩm định");
+});
+
+test("B4: hạng mục đã hoàn thành VMP thì không có giai đoạn chặn", () => {
+  const model = buildTodayActionModel([{
+    id: "V-VMP-XONG", validationCode: "V-VMP-XONG", st: "done", state: "active",
+    dlVmp: "2026-08-10", ownerPersonId: ID_A,
+    _raw: { tt_vmp: "completed" },
+  }], { now: HOM_NAY, rights: new Map(), rightsStatus: "ready" });
+  assert.equal(model.rows[0].validationCode, "V-VMP-XONG");
+  assert.equal(model.rows[0].blockingStage, null);
+});
+
 test("chỉ person id chính tắc quyết định ownership, kể cả id trong _raw", () => {
   const activity = {
     id: "V-OWNER", validationCode: "V-OWNER", st: "prog", state: "active",
@@ -116,6 +135,22 @@ test("chỉ person id chính tắc quyết định ownership, kể cả id trong
   assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null, supportPersonId: null, _raw: { support_person_id: ID_A } }, ID_A), true);
   assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null, supportPersonId: null, _raw: { support_person_id: ID_B } }, ID_A), false);
   assert.equal(isTodayActivityMine({ ...activity, ownerPersonId: null }, ID_A), false);
+});
+
+test("B1: QA hỗ trợ chính và QA hỗ trợ thêm (support_person_ids trong _raw) đều thấy là của mình", () => {
+  const LAN = "aaaaaaaa-0000-4000-8000-000000000001";
+  const HOA = "aaaaaaaa-0000-4000-8000-000000000002";
+  const MINH = "aaaaaaaa-0000-4000-8000-000000000003";
+  // Hình dạng đúng như rpc_get_vmp_dashboard trả sau migration 20261110160000.
+  const activity = {
+    id: "V-HO-TRO", validation_code: "V-HO-TRO", st: "prog", state: "active", owner: "Lan",
+    _raw: { owner_person_id: LAN, support_person_id: HOA, support_person_ids: [HOA, MINH] },
+  };
+  assert.equal(isTodayActivityMine(activity, LAN), true);
+  assert.equal(isTodayActivityMine(activity, HOA), true);
+  assert.equal(isTodayActivityMine(activity, MINH), true, "QA hỗ trợ thêm phải thấy hạng mục");
+  assert.equal(isTodayActivityMine(activity, "aaaaaaaa-0000-4000-8000-000000000009"), false);
+  assert.equal(isTodayActivityMine({ ...activity, _raw: { ...activity._raw, support_person_ids: "khong-phai-mang" } }, MINH), false);
 });
 
 test("dùng item id chính tắc từ n8n thay vì mã đối tượng để tra quyền", () => {

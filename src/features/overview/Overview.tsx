@@ -6,7 +6,7 @@ import { tally, docTally, runDataQualityChecks } from "../../utils/helpers.ts";
 import type { AccessContext, ScreenId } from "../../lib/access.ts";
 import type { Activity } from "../../types/domain.ts";
 import { overviewTarget } from "../../lib/navigationTargets.ts";
-import { bangkokCalendarDate, classifyVmpDeadline } from "../../lib/vmpDeadlineModel.ts";
+import { bangkokCalendarDate, classifyVmpDeadline, hasVmpDateWithoutCompletedStatus } from "../../lib/vmpDeadlineModel.ts";
 import VongNam from "../../components/dashboard/VongNam.tsx";
 import CompletionDashboard from "../../components/dashboard/CompletionDashboard.tsx";
 import MaTranTienDo from "../../components/dashboard/MaTranTienDo.tsx";
@@ -24,7 +24,7 @@ export default function Overview({ acts, setView, access }: {
   const now = new Date();
   const currentBangkokDate = bangkokCalendarDate(now);
   const currentBangkokYear = Number(currentBangkokDate.slice(0, 4));
-  const { e, d, overdue, soon, gap, mismatched } = useMemo(() => {
+  const { e, d, overdue, soon, gap, mismatched, coNgayChuaTrangThai } = useMemo(() => {
     const e = tally(acts), d = docTally(acts);
     const overdue = acts.filter((a) => classifyVmpDeadline(a, now, 30).kind === "overdue");
     const soon = acts.filter((a) => {
@@ -36,6 +36,7 @@ export default function Overview({ acts, setView, access }: {
       e, d, overdue, soon,
       gap: e.done - d.done,
       mismatched: acts.filter((a) => a.mismatch),
+      coNgayChuaTrangThai: acts.filter(hasVmpDateWithoutCompletedStatus).length,
     };
   }, [acts, now]);
 
@@ -107,7 +108,8 @@ export default function Overview({ acts, setView, access }: {
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
               {[
                 { id: "completed", l: "Hoàn thành", v: e.done, c: C.mint, t: C.mintText },
-                { id: "incomplete", l: "Chưa hoàn thành", v: e.todo, c: C.marigold, t: C.marigoldText },
+                // Chưa hoàn thành = tổng − hoàn thành (gồm cả mục quá hạn).
+                { id: "incomplete", l: "Chưa hoàn thành", v: e.total - e.done, c: C.marigold, t: C.marigoldText },
               ].map((x) => (
                 <div key={x.id} data-overview-metric={x.id} className="vmp-overview-progress__row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: 9, height: 9, borderRadius: 999,
@@ -152,9 +154,9 @@ export default function Overview({ acts, setView, access }: {
       <StatTile cls="b-k1" icon={AlertCircle} label="Quá hạn đích VMP" value={overdue.length}
         metricId="vmp-overdue"
         tone={{ c: C.raspText, bg: C.raspSoft }} onClick={di(destinations.overdue)}
-        sub={overdue.length
-          ? `trong đó ${Math.max(0, overdue.length - e.over)} chưa cập nhật trạng thái`
-          : "Không có hạng mục quá hạn"} />
+        sub={coNgayChuaTrangThai > 0
+          ? `${coNgayChuaTrangThai} mục có ngày xong, chưa đổi trạng thái`
+          : overdue.length ? undefined : "Không có hạng mục quá hạn"} />
 
       <StatTile cls="b-k2" icon={Clock} label="Tới hạn đích VMP 30 ngày" value={soon.length}
         tone={{ c: C.marigoldText, bg: C.marigoldSoft }} onClick={di(destinations.soon)}

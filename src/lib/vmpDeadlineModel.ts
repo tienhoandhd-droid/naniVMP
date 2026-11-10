@@ -78,6 +78,14 @@ export function isVmpComplete(activity: Activity): boolean {
   return wlIsDone(firstValue(activity, ["tt_vmp", "status_vmp"]));
 }
 
+/** Có ngày VMP thực tế nhưng trạng thái VMP chưa là Hoàn thành (đã tính là xong theo
+ *  định nghĩa chung, chỉ còn thiếu cập nhật trạng thái). */
+export function hasVmpDateWithoutCompletedStatus(activity: Activity): boolean {
+  if (activityState(activity) !== "active") return false;
+  if (firstIsoDate(activity, ["actVmp", "actual_vmp_date", "ngay_vmp"]) === null) return false;
+  return !wlIsDone(firstValue(activity, ["tt_vmp", "status_vmp"]));
+}
+
 /** Converts a real instant to its Bangkok calendar date without host-timezone truncation.
  *  Uỷ quyền cho hanChot.ts (D2) — giữ tên export vì ~10 nơi đang import. */
 export function bangkokCalendarDate(now: Date): string {

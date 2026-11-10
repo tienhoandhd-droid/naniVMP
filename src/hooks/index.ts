@@ -52,6 +52,8 @@ import {
   updateItemProgress, upsertObjectSupabase, fetchPerformers,
 } from "../lib/supabaseData.ts";
 import { enrich } from "../utils/helpers.ts";
+// Năm kế hoạch theo lịch Bangkok (giờ nhà máy), không theo giờ máy người dùng.
+import { vmpToday } from "../constants/vmp.ts";
 import {
   loadSnapshot,
   saveSnapshot,
@@ -185,7 +187,7 @@ export function useVmpData() {
    * thiếu revision phải ném để caller thu hồi dữ liệu, không được coi là
    * “không thay đổi”. */
   const readWatermark = useCallback(async (): Promise<AuthorizationWatermark> =>
-    fetchVmpWatermark(new Date().getFullYear()), []);
+    fetchVmpWatermark(vmpToday().getFullYear()), []);
   const sigOf = (objs: VmpObject[] | null, activities: Activity[]): string => {
     try { return JSON.stringify(activities) + "|" + (objs ? objs.length : 0); }
     catch { return String(Date.now()); }
@@ -213,7 +215,7 @@ export function useVmpData() {
     if (supabase) {
       const requestId = ++dataRequestRef.current;
       legacyRequestId = requestId;
-      const nam = new Date().getFullYear();
+      const nam = vmpToday().getFullYear();
 
       let permissionContext: Awaited<ReturnType<typeof readItemPermissionContext>>;
       try {
@@ -423,7 +425,7 @@ export function useVmpData() {
         // watermark và payload cùng chịu một generation check.
         [wm, prefetchedData] = await Promise.all([
           wmPromise,
-          fetchVmpDataFromSupabase(new Date().getFullYear()),
+          fetchVmpDataFromSupabase(vmpToday().getFullYear()),
         ]);
       } else {
         wm = await wmPromise;
@@ -447,7 +449,7 @@ export function useVmpData() {
 
       // Enforced luôn đi qua RPC đã lọc quyền: thu hồi phân công phải phản ánh
       // dù updated_at/count của dữ liệu nghiệp vụ không đổi.
-      const data = prefetchedData ?? await fetchVmpDataFromSupabase(new Date().getFullYear());
+      const data = prefetchedData ?? await fetchVmpDataFromSupabase(vmpToday().getFullYear());
       if (requestId !== dataRequestRef.current) return;
       const matchedRevision = matchedAuthorizationRevision({
         year: data.year ?? 0,
@@ -467,7 +469,7 @@ export function useVmpData() {
       if (Array.isArray(data.activities)) setActs(data.activities);
       if (policy.allowSnapshot) {
         saveSnapshot(
-          new Date().getFullYear(),
+          vmpToday().getFullYear(),
           permissionContext.userId,
           permissionContext.mode,
           matchedRevision,

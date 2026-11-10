@@ -86,3 +86,19 @@ test("overview preserves QA personal scope and privileged optional selection", a
   assert.deepEqual(selectOverviewActivities("admin", "admin", "qa-person", [], [mine, other]), [mine]);
   assert.deepEqual(selectOverviewActivities("workshop_staff", "mai", null, [other], [other]), []);
 });
+
+test("B1: Tổng quan của QA hỗ trợ thêm gồm hạng mục mình hỗ trợ; danh sách chọn người có QA đó", async () => {
+  const { selectOverviewActivities } = await import("../../src/lib/personProgressScope.ts");
+  const extra = "33333333-3333-4333-8333-333333333333";
+  const item = {
+    id: "ho-tro-them", owner: "Nguyễn QA", state: "active",
+    _raw: {
+      owner_person_id: "11111111-1111-4111-8111-111111111111",
+      support_person_id: "22222222-2222-4222-8222-222222222222",
+      support_person_ids: ["22222222-2222-4222-8222-222222222222", extra],
+    },
+  };
+  assert.deepEqual(selectOverviewActivities("qa_staff", extra, null, [], [item]), [item]);
+  assert.ok(buildPersonProgressChoices([item]).some((choice) => choice.personId === extra),
+    "QA hỗ trợ thêm phải có trong danh sách chọn người");
+});

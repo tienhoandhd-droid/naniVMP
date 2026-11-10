@@ -1,4 +1,4 @@
-import { isTodayActivityMine } from "../features/today/todayModel.ts";
+import { isTodayActivityMine, supportPersonIds } from "../features/today/todayModel.ts";
 import type { BusinessRole } from "./businessRoles.ts";
 import type { Activity } from "../types/domain.ts";
 
@@ -56,6 +56,8 @@ export function buildPersonProgressChoices(
       value(activity, ["supportPersonId", "support_person_id"]),
       value(activity, ["support", "support_name", "secondary_owner"]),
     );
+    // QA hỗ trợ thêm: chỉ có id; tên lấy từ hạng mục khác nếu người đó phụ trách/hỗ trợ chính.
+    for (const personId of supportPersonIds(activity)) add(personId, null);
   }
 
   return [...byId.values()]

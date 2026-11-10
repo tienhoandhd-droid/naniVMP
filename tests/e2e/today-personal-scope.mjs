@@ -293,9 +293,9 @@ async function openToday({
     }, cachedUser);
   }
   const statusAsOf = now ? bangkokDayAt(now) : bangkokDay(0);
-  // The dashboard request follows the browser's Date year (UTC in the
-  // boundary case); the Today/Overview deadline presentation uses Bangkok.
-  const fixtureYear = new Date(now || Date.now()).getUTCFullYear();
+  // 10/11 (B5): dashboard/watermark request the Bangkok calendar year, the
+  // same year Today/Overview present — no longer the browser's UTC year.
+  const fixtureYear = Number(statusAsOf.slice(0, 4));
   const { chanNgoai } = await caiGiaLap(page, {
     supabaseUrl: URL_SB,
     kichBan: "day",

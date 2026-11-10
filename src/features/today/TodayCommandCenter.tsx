@@ -59,7 +59,8 @@ function progressLink(row: TodayActionRow): ProgressDeepLink {
 }
 /** Tên mốc đang chặn — cột "Mốc" trong bảng. */
 function tenMoc(row: TodayActionRow): string {
-  return row.deadlineStage ? row.deadlineStage : `Chờ ${row.blockingStage}`;
+  if (row.deadlineStage) return row.deadlineStage;
+  return row.blockingStage ? `Chờ ${row.blockingStage}` : "Đã xong VMP";
 }
 /** Số ngày còn/trễ — cột "Trễ" trong bảng. */
 function soNgay(row: TodayActionRow): { chu: string; loai: "tre" | "homnay" | "con" | "trong" } {
@@ -69,7 +70,9 @@ function soNgay(row: TodayActionRow): { chu: string; loai: "tre" | "homnay" | "c
   return { chu: `còn ${row.daysRemaining} ngày`, loai: "con" };
 }
 function deadlineFact(row: TodayActionRow): string {
-  if (!row.deadlineStage || row.daysRemaining === null) return `Đang chờ ${row.blockingStage}`;
+  if (!row.deadlineStage || row.daysRemaining === null) {
+    return row.blockingStage ? `Đang chờ ${row.blockingStage}` : "Đã xong VMP";
+  }
   if (row.daysRemaining < 0) return `mốc ${row.deadlineStage} · trễ ${Math.abs(row.daysRemaining)} ngày`;
   if (row.daysRemaining === 0) return `mốc ${row.deadlineStage} · hạn hôm nay`;
   return `mốc ${row.deadlineStage} · còn ${row.daysRemaining} ngày`;
@@ -124,7 +127,7 @@ function TodayRowDetails({ row, id, hidden }: { row: TodayActionRow; id: string;
       <div><dt>QA phụ trách</dt><dd>{row.ownerName}</dd></div>
       <div><dt>Bộ phận</dt><dd>{row.department || "Chưa xác định"}</dd></div>
       <div><dt>Trọng yếu</dt><dd>{row.criticality || "Chưa xếp hạng"}</dd></div>
-      <div><dt>Đang chờ</dt><dd>{row.blockingStage}</dd></div>
+      <div><dt>Đang chờ</dt><dd>{row.blockingStage ?? "Không"}</dd></div>
       <div><dt>Hạn</dt><dd>{deadlineFact(row)}</dd></div>
     </dl>
     <div className="hn-ly-do" aria-label={`Lý do ưu tiên ${row.validationCode}`}>
@@ -153,7 +156,7 @@ function TodayQueueRow({ row, expanded, onToggle, onOpenProgress }: {
         {/* Chuỗi gộp giữ trong DOM cho phần chi tiết và trình đọc màn hình. */}
         <span className="hn-muc__han">{deadlineFact(row)}</span><span className="hn-muc__chu-so-huu">{row.ownerName}</span>
         <span className="hn-muc__muc-do">{row.criticality || "Chưa xếp hạng"}</span>
-        <span className="hn-muc__cho">Đang chờ {row.blockingStage}</span>
+        {row.blockingStage && <span className="hn-muc__cho">Đang chờ {row.blockingStage}</span>}
         <div className="hn-ly-do">{row.reasons.map((reason) => <span key={reason.kind} className="hn-ly-do__badge">{reason.label}</span>)}</div>
       </div>
       {row.canEditProgress

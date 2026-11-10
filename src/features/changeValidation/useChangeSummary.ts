@@ -27,11 +27,13 @@ export function useChangeSummary(year: number): ChangeSummaryState {
     return () => { cancelled = true; };
   }, []);
 
+  // Tính "hôm nay" (giờ VN) mỗi lần render như các màn khác, để mở web qua
+  // ngày mới thì số liệu tính lại thay vì giữ ngày cũ trong useMemo.
+  const today = dayFormatter.format(new Date());
   return useMemo<ChangeSummaryState>(() => {
     if (error) return { status: "error", message: error };
     if (!records) return { status: "loading" };
-    const today = dayFormatter.format(new Date());
     // Trả kèm danh sách phiếu để màn hình tự đếm phiếu chưa gắn đợt theo năm hoặc theo kỳ.
     return { status: "ready", summary: summarizeChanges(records, year, today), records, today };
-  }, [records, error, year]);
+  }, [records, error, year, today]);
 }

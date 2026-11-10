@@ -12,6 +12,10 @@
  *     các BẢNG ÁNH XẠ bên dưới (CLS_MAP, DEPT_MAP, normStatus...).
  * ===================================================================== */
 
+import { vmpToday } from "../constants/vmp.ts";
+import { isVmpComplete } from "./vmpDeadlineModel.ts";
+import type { Activity } from "../types/domain.ts";
+
 /* ---------- Tiện ích ---------- */
 const s = (v: unknown): string => (v == null ? "" : String(v)).trim();
 const lc = (v: unknown): string => s(v).toLowerCase();
@@ -100,15 +104,20 @@ function normStatus(v: unknown): "done" | "prog" | "todo" | "" {
 }
 
 /* ---------- Suy ra trạng thái tổng (st) của 1 hạng mục ----------
- *  Ưu tiên: trạng thái VMP > quá hạn theo ngày > đang thực hiện > kế hoạch/chưa.
+ *  Ưu tiên: hoàn thành VMP > quá hạn theo ngày > đang thực hiện > chưa làm/kế hoạch.
  *  st ∈ done | prog | over | todo | plan  (khớp với STATUS trong App.jsx)
+ *  10/11: dùng CHUNG định nghĩa đã chốt 07/11 — hoàn thành = isVmpComplete
+ *  (trạng thái Hoàn thành HOẶC có ngày VMP thực tế); quá hạn = chưa hoàn thành
+ *  và hạn VMP < hôm nay giờ VN; chưa làm/kế hoạch như compute_item_status_v2.
  */
 /** Một dòng thô từ webhook n8n / cột _raw của Supabase. */
 type RawRow = Record<string, unknown>;
 
 function deriveSt(row: RawRow, today: Date): "done" | "prog" | "over" | "todo" | "plan" {
   const vmp = normStatus(row.tt_vmp);
-  if (vmp === "done") return "done";
+  // ngay_vmp từ Sheet có thể là dd/mm/yyyy → chuẩn hoá trước khi hỏi isVmpComplete.
+  const raw = { ...row, ngay_vmp: toISO(row.ngay_vmp) || null };
+  if (vmp === "done" || isVmpComplete({ _raw: raw } as unknown as Activity)) return "done";
 
   const target = parseDate(row.dl_vmp);
   const stages = [normStatus(row.tt_de_cuong), normStatus(row.tt_tham_dinh), normStatus(row.tt_bao_cao)];
@@ -119,11 +128,11 @@ function deriveSt(row: RawRow, today: Date): "done" | "prog" | "over" | "todo" |
   if (target && target < today) return "over";
   if (anyProg || anyDone) return "prog";
 
-  // Chưa bắt đầu: nếu deadline đề cương còn xa (>30 ngày) coi là "kế hoạch".
-  const proto = parseDate(row.dl_de_cuong);
+  // Chưa bắt đầu: như compute_item_status_v2 — hạn VMP còn ≤ 30 ngày là "chưa
+  // làm", xa hơn hoặc chưa có hạn là "kế hoạch".
   const SOON = 30 * 86400000;
-  if (proto && proto.getTime() - today.getTime() > SOON) return "plan";
-  return "todo";
+  if (target && target.getTime() - today.getTime() <= SOON) return "todo";
+  return "plan";
 }
 
 /* =====================================================================
@@ -160,8 +169,7 @@ export function adaptFromN8n(
   }
 
   const rows: RawRow[] = Array.isArray(p.rows) ? (p.rows as RawRow[]) : [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = vmpToday();
 
   const objMap = new Map();   // ma -> object (gộp trùng)
   const activities = [];
@@ -242,8 +250,7 @@ export function deriveActivityFields(raw: RawRow): {
   docDone: boolean;
   target: string;
 } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = vmpToday();
   return {
     st: deriveSt(raw, today),
     docDone: normStatus(raw.tt_bao_cao) === "done",

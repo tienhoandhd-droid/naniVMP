@@ -1,7 +1,8 @@
 import type { Activity } from "../../types/domain.ts";
 import type { EditableProgressRight } from "../progress/editableProgressRights.ts";
 import type { EditableTimelineField } from "../itemPermissions/types.ts";
-import { classifyVmpDeadline } from "../../lib/vmpDeadlineModel.ts";
+import { classifyVmpDeadline, isVmpComplete } from "../../lib/vmpDeadlineModel.ts";
+import { wlIsDone } from "../../utils/helpers.ts";
 
 export type TodayReasonKind =
   | "overdue" | "due_today" | "due_7d"
@@ -23,7 +24,8 @@ export interface TodayActionRow {
   ownerName: string;
   criticality: string;
   criticalityScore: number | null;
-  blockingStage: string;
+  /** Giai đoạn đang chờ; null khi hạng mục đã hoàn thành VMP. */
+  blockingStage: string | null;
   deadlineStage: string | null;
   daysRemaining: number | null;
   reasons: TodayReason[];
@@ -49,10 +51,10 @@ export interface ProgressDeepLink {
 }
 
 const STAGES = [
-  { deadline: "dlProtocol", actual: "actProtocol", rawDeadline: ["deadline_protocol", "dl_protocol"], rawActual: ["actual_protocol_date", "ngay_de_cuong"], done: "protocol_done", label: "Đề cương" },
-  { deadline: "dlValidation", actual: "actValidation", rawDeadline: ["deadline_validation", "dl_validation"], rawActual: ["actual_validation_date", "ngay_tham_dinh"], done: "validation_done", label: "Thẩm định" },
-  { deadline: "dlReport", actual: "actReport", rawDeadline: ["deadline_report", "dl_report"], rawActual: ["actual_report_date", "ngay_bao_cao"], done: "report_done", label: "Báo cáo" },
-  { deadline: "dlVmp", actual: "actVmp", rawDeadline: ["deadline_vmp", "dl_vmp"], rawActual: ["actual_vmp_date", "ngay_vmp"], done: "vmp_done", label: "Đích VMP" },
+  { deadline: "dlProtocol", actual: "actProtocol", rawDeadline: ["deadline_protocol", "dl_protocol"], rawActual: ["actual_protocol_date", "ngay_de_cuong"], done: "protocol_done", rawStatus: ["tt_de_cuong", "status_protocol"], label: "Đề cương" },
+  { deadline: "dlValidation", actual: "actValidation", rawDeadline: ["deadline_validation", "dl_validation"], rawActual: ["actual_validation_date", "ngay_tham_dinh"], done: "validation_done", rawStatus: ["tt_tham_dinh", "status_validation"], label: "Thẩm định" },
+  { deadline: "dlReport", actual: "actReport", rawDeadline: ["deadline_report", "dl_report"], rawActual: ["actual_report_date", "ngay_bao_cao"], done: "report_done", rawStatus: ["tt_bao_cao", "status_report"], label: "Báo cáo" },
+  { deadline: "dlVmp", actual: "actVmp", rawDeadline: ["deadline_vmp", "dl_vmp"], rawActual: ["actual_vmp_date", "ngay_vmp"], done: "vmp_done", rawStatus: ["tt_vmp", "status_vmp"], label: "Đích VMP" },
 ] as const;
 type Raw = Record<string, unknown>;
 
@@ -77,9 +79,11 @@ function asDateString(value: unknown): string | null {
   return Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ? null : date;
 }
 
+/** Giai đoạn xong khi có ngày thực tế, hoặc cờ done, hoặc trạng thái giai đoạn = Hoàn thành. */
 function stageComplete(activity: Activity, stage: typeof STAGES[number]): boolean {
   if (asDateString(firstValue(activity, stage.actual, stage.rawActual))) return true;
-  return rawOf(activity)[stage.done] === true;
+  if (rawOf(activity)[stage.done] === true) return true;
+  return wlIsDone(firstValue(activity, stage.rawStatus[0], stage.rawStatus.slice(1)));
 }
 
 function activityState(activity: Activity): string {
@@ -125,10 +129,18 @@ function supportPersonId(activity: Activity): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+/** Người hỗ trợ chính + QA hỗ trợ thêm (rpc_get_vmp_dashboard → _raw.support_person_ids). */
+export function supportPersonIds(activity: Activity): string[] {
+  const value = firstValue(activity, "supportPersonIds", ["support_person_ids"]);
+  if (!Array.isArray(value)) return [];
+  return value.filter((x): x is string => typeof x === "string" && x.trim() !== "").map((x) => x.trim());
+}
+
 export function isTodayActivityMine(activity: Activity, personId: string): boolean {
   if (typeof personId !== "string" || !personId.trim()) return false;
   const id = personId.trim();
-  return ownerPersonId(activity) === id || supportPersonId(activity) === id;
+  return ownerPersonId(activity) === id || supportPersonId(activity) === id
+    || supportPersonIds(activity).includes(id);
 }
 
 function criticality(activity: Activity): string {
@@ -202,7 +214,8 @@ function makeRow(activity: Activity, now: Date, options: {
   const code = validationCode(activity);
   if (!code) return null;
   const unfinished = unfinishedStages(activity);
-  const blockingStage = unfinished[0]?.label ?? "Đích VMP";
+  // Đã hoàn thành VMP thì không còn giai đoạn nào chặn.
+  const blockingStage = isVmpComplete(activity) ? null : unfinished[0]?.label ?? "Đích VMP";
   const serverDeadline = asDateString(activity.canonicalDeadline ?? activity.target);
   const legacyDeadline = activity.statusSource === "server" ? null : classifyVmpDeadline(activity, now, 7);
   const deadlineStage = activity.statusSource === "server"
@@ -288,7 +301,7 @@ function legacyRow(row: TodayActionRow): TodayRow {
   const kind: TodayRowKind = row.section === "overdue" ? "overdue" : row.section === "incomplete" ? "incomplete_record" : "due_7d";
   return {
     validationCode: row.validationCode, title: row.title,
-    milestoneLabel: row.reasons.find((reason) => reason.stage)?.stage ?? row.blockingStage,
+    milestoneLabel: row.reasons.find((reason) => reason.stage)?.stage ?? row.blockingStage ?? "",
     daysRemaining: row.daysRemaining, kind,
     reasons: row.reasons.map((reason) => reason.kind),
   };
