@@ -1,7 +1,8 @@
 -- C7 (rà soát 10/11): kiểm CHỈ ĐỌC trên production.
 -- Đếm hồ sơ CHƯA DUYỆT (phiên bản hiện hành) có KẾT LUẬN đã lưu (PDF in) khác kết luận
 -- TÍNH LẠI bằng evaluate() hiện hành — cùng phép so với record_sign_evaluation:
--- cpc1_private.evaluation_verdicts (overall, status biểu mẫu, status từng dòng, controls.status).
+-- cpc1_private.evaluation_verdicts (overall, status biểu mẫu, kết luận từng điểm, status từng dòng
+-- và từng thông số `parameters`, controls.status).
 -- Cần hàm evaluation_verdicts → chạy SAU khi áp 20261110170000 (migration không đổi dữ liệu),
 -- hoặc trong giao dịch áp migration trước COMMIT.
 -- Sau khi áp, các hồ sơ này bị chặn ký kiểm tra/duyệt. 0 = không ảnh hưởng.

@@ -16,7 +16,8 @@
 --     · record_sign_evaluation: NGUYÊN VĂN bản 20261021100000_tham_dinh_chan_du_lieu_sai.sql,
 --       chỉ chèn phép so sánh. KHÔNG tự chấm lại, KHÔNG ghi revision nào.
 --     · Chủ dự án chốt (10/11): CHỈ so KẾT LUẬN — overall, status từng biểu mẫu,
---       status từng dòng, controls.status — qua cpc1_private.evaluation_verdicts.
+--       kết luận từng điểm, status từng dòng + từng thông số, controls.status —
+--       qua cpc1_private.evaluation_verdicts.
 --       KHÔNG so chữ lỗi/cảnh báo, formula_version, values (result/print_result…).
 --     · Đợt còn mở (chấm lại được): "…cần chấm lại trước khi ký."; đợt đã đóng
 --       hoặc không thuộc đợt: "…Liên hệ Admin." 
@@ -24,8 +25,11 @@
 -- =====================================================================
 begin;
 
--- Kết luận của một kết quả chấm: overall, controls.status, và với mỗi biểu mẫu
--- status + status từng dòng (dòng hơi là mảng theo lần đo; dòng khí là object).
+-- Kết luận của một kết quả chấm (mọi nhánh mang kết luận được in/dùng để ký, đã quét
+-- trên dữ liệu thật 3 hệ): overall, controls.status, và với mỗi biểu mẫu: status,
+-- locations (kết luận từng điểm của hơi), rows → status từng dòng (dòng hơi là mảng theo
+-- lần đo; dòng khí là object) kèm `parameters` nếu dòng có (status từng thông số BM02 hơi,
+-- in lên PDF ô parameterStatus). Không lấy values/errors/warnings/formula_version/summary.
 create function cpc1_private.evaluation_verdicts(ev jsonb)
  returns jsonb
  language sql
@@ -36,10 +40,11 @@ select jsonb_build_object(
  'overall', ev->'overall',
  'controls', ev#>'{controls,status}',
  'forms', coalesce((
-  select jsonb_object_agg(f.key, jsonb_build_object('status', f.value->'status', 'rows', coalesce((
+  select jsonb_object_agg(f.key, jsonb_build_object('status', f.value->'status', 'locations', f.value->'locations', 'rows', coalesce((
    select jsonb_object_agg(r.key, case jsonb_typeof(r.value)
-     when 'array' then (select jsonb_agg(x.value->'status' order by x.n) from jsonb_array_elements(r.value) with ordinality x(value, n))
-     when 'object' then r.value->'status' end)
+     when 'array' then (select jsonb_agg(jsonb_build_object('status', x.value->'status', 'parameters', x.value->'parameters') order by x.n)
+                        from jsonb_array_elements(r.value) with ordinality x(value, n))
+     when 'object' then jsonb_build_object('status', r.value->'status', 'parameters', r.value->'parameters') end)
    from jsonb_each(case when jsonb_typeof(f.value->'rows') = 'object' then f.value->'rows' else '{}'::jsonb end) r), '{}'::jsonb)))
   from jsonb_each(case when jsonb_typeof(ev->'forms') = 'object' then ev->'forms' else '{}'::jsonb end) f
   where jsonb_typeof(f.value) = 'object'), '{}'::jsonb))

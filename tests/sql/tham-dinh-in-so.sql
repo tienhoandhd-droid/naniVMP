@@ -85,6 +85,13 @@ select pg_temp.ok('C7-03 không tự chấm lại: kết quả đã lưu giữ n
    join public.cpc1_revisions v on v.record_id = r.id and v.version = r.version where r.id = '8d8884e1-fd53-428a-be92-7badd79c513c') = 'fail'
   and (select version from public.cpc1_records where id = '8d8884e1-fd53-428a-be92-7badd79c513c') = 3);
 
+-- (b2) Hơi 40bde8cb (cùng đợt vừa mở ở (b)): đổi status MỘT thông số BM02 (parameters.toc) — status dòng giữ nguyên
+--      → kết luận thông số được in PDF (ô parameterStatus) khác → chặn, "cần chấm lại".
+select pg_temp.sua_luu('40bde8cb-c9fe-4f7e-bb31-43e030821c07', array['forms','bm02','rows',pg_temp.dong_dau('40bde8cb-c9fe-4f7e-bb31-43e030821c07','bm02'),'parameters','toc'], '"fail"');
+select pg_temp.ok('C7-02b khác status thông số BM02 (toc), status dòng không đổi → không ký được, báo cần chấm lại',
+  pg_temp.co_ly_do(r, 'Hồ sơ được chấm bằng công thức cũ — cần chấm lại trước khi ký.'), r::text)
+from (select pg_temp.ky('40bde8cb-c9fe-4f7e-bb31-43e030821c07') r) x;
+
 -- (c) Nitơ 1760d54a (đợt đã đóng, không chấm lại được): khác overall → chặn, "Liên hệ Admin".
 select pg_temp.sua_luu('1760d54a-d935-4499-ba12-333e0562a778', array['overall'], '"fail"');
 select pg_temp.ok('C7-04 đợt đã đóng, khác kết luận → không ký được, báo Liên hệ Admin',
@@ -95,6 +102,11 @@ select pg_temp.ok('C7-05 evaluation_verdicts bỏ qua values/errors/warnings/for
   = cpc1_private.evaluation_verdicts('{"overall":"pass","formula_version":"b","forms":{"bm01":{"status":"pass","rows":{"P1":[{"status":"pass","values":{"result":"2"},"errors":{"x":"y"},"warnings":{"t3":"z"}}]}}}}')
   and cpc1_private.evaluation_verdicts('{"overall":"pass","controls":{"status":"pass"},"forms":{}}')
   <> cpc1_private.evaluation_verdicts('{"overall":"pass","controls":{"status":"fail"},"forms":{}}'));
+select pg_temp.ok('C7-06 evaluation_verdicts nhận khác status thông số (parameters) và trạng thái điểm (locations)',
+  cpc1_private.evaluation_verdicts('{"forms":{"bm02":{"status":"pass","rows":{"P1":{"status":"pass","parameters":{"toc":"pass"}}}}}}')
+  <> cpc1_private.evaluation_verdicts('{"forms":{"bm02":{"status":"pass","rows":{"P1":{"status":"pass","parameters":{"toc":"fail"}}}}}}')
+  and cpc1_private.evaluation_verdicts('{"forms":{"bm01":{"status":"pass","locations":{"P1":"pass"},"rows":{}}}}')
+  <> cpc1_private.evaluation_verdicts('{"forms":{"bm01":{"status":"pass","locations":{"P1":"fail"},"rows":{}}}}'));
 
 do $$
 declare n_fail int; n_all int;
