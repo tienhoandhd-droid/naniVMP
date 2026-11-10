@@ -308,7 +308,7 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
   /* Danh bạ đầy đủ chỉ cần khi vai hiện tại có quyền đổi người thực hiện.
      QA/xưởng chỉ cập nhật cột tiến độ server cấp, nên không được phát sinh
      một lần đọc danh bạ toàn cục chỉ vì mở hộp thoại. */
-  const { performers } = usePerformers(canChonNguoiThucHien);
+  const { performers, error: performersError } = usePerformers(canChonNguoiThucHien);
   const performerChoices = buildActivePerformerChoices(performers);
   const rawOwnerPersonId = raw.owner_person_id ? String(raw.owner_person_id) : null;
   const ownerPersonIdNow = rawOwnerPersonId
@@ -729,6 +729,9 @@ export default function ProgressEditModal({ act, canChonNguoiThucHien, canDoiTra
                 if (err) setErr("");
               }}
             />
+            {performersError && (
+              <span role="alert" style={{ fontSize: 12, color: C.raspText, fontWeight: 700 }}>{performersError}</span>
+            )}
             <span style={{ fontSize: 12, color: C.plumSoft, fontWeight: 600, lineHeight: 1.45 }}>
               {selectedPerformer
                 ? <>Email: <b style={{ color: C.plum }}>{selectedPerformer.email || "chưa có"}</b>{selectedPerformer.department ? ` · ${selectedPerformer.department}` : " · chưa có bộ phận"}</>

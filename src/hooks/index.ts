@@ -111,9 +111,14 @@ export function usePerformers(enabled = true): {
   performers: PerformerRow[];
   names: string[];
   find: (name?: string | null) => PerformerRow | undefined;
+  /** Có chữ khi không tải được danh sách; ô nhập vẫn dùng được nhưng
+   *  giao diện nên báo để người dùng biết gợi ý đang thiếu. */
+  error: string | null;
 } {
   const [performers, setPerformers] = useState<PerformerRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
+    setError(null);
     if (!enabled) {
       setPerformers([]);
       return undefined;
@@ -121,7 +126,13 @@ export function usePerformers(enabled = true): {
     let alive = true;
     fetchPerformers()
       .then((rows) => { if (alive) setPerformers(rows.filter((r) => r.is_active)); })
-      .catch(() => { /* danh sách gợi ý hỏng thì ô nhập vẫn dùng được */ });
+      .catch((caught: unknown) => {
+        console.error("[VMP] Không tải được danh sách người thực hiện.", caught);
+        if (alive) {
+          setPerformers([]);
+          setError("Không tải được danh sách người thực hiện");
+        }
+      });
     return () => { alive = false; };
   }, [enabled]);
   const byName = useMemo(() => {
@@ -133,6 +144,7 @@ export function usePerformers(enabled = true): {
     performers,
     names: useMemo(() => performers.map((p) => p.performer_name), [performers]),
     find: (name) => byName.get(String(name || "").trim().toLowerCase()),
+    error,
   };
 }
 

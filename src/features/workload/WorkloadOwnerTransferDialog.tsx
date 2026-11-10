@@ -170,6 +170,7 @@ export default function WorkloadOwnerTransferDialog({
             Không có người hoạt động khác để chuyển.
           </p>
         )}
+        {directory.error && !error && <p role="alert" style={{ margin: 0, color: C.raspText, fontSize: 13, fontWeight: 700 }}>{directory.error}</p>}
         {error && <p role="alert" style={{ margin: 0, color: C.raspText, fontSize: 13, fontWeight: 700 }}>{error}</p>}
         {hopXacNhan}
       </div>

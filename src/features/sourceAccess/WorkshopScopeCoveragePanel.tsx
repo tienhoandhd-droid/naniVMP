@@ -200,9 +200,8 @@ export default function WorkshopScopeCoveragePanel({
           return;
         }
         if (result.errorCode === "VERSION_CONFLICT") refresh();
-        if (result.errorCode !== "NETWORK" && result.errorCode !== "NOT_CONFIGURED" && result.errorCode !== "MALFORMED_RESPONSE") {
-          setReason("");
-        }
+        /* Lưu lỗi thì GIỮ lý do đã gõ — xoá đi là bắt người dùng gõ lại
+           từ đầu chỉ để thử lại sau khi sửa phần khác. */
         setMessage(result.error);
         return;
       }

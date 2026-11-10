@@ -47,7 +47,10 @@ export function useAuth() {
         }
         if (tinhTrang === "co" && phien) { setUser(phien); saveUser(phien); }
       })
-      .catch(() => { /* không kết luận được — giữ nguyên, lần sau thử lại */ })
+      .catch((caught: unknown) => {
+        /* không kết luận được — giữ nguyên, lần sau thử lại */
+        console.error("[VMP] Không đọc được phiên đăng nhập.", caught);
+      })
       .finally(() => { if (con) setLoading(false); });
 
     /* Phiên chết GIỮA CHỪNG lúc tab đang mở: autoRefreshToken thử gia hạn,

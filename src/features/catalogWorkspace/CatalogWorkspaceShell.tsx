@@ -1043,7 +1043,9 @@ export default function CatalogWorkspaceShell({
             if (!kq.ok) {
               const thongBao = kq.error_code === "VERSION_CONFLICT"
                 ? "Người khác vừa sửa. Tải lại rồi sửa lại."
-                : (kq.error ?? "Lưu danh mục thất bại");
+                : kq.error_code === "OBJECT_EXISTS"
+                  ? `Mã ${ma} đã có trong Danh mục. Mở đối tượng đó để sửa.`
+                  : (kq.error ?? "Lưu danh mục thất bại");
               dang.hong(thongBao);
               /* Ném tiếp để form giữ nguyên hộp thoại và dữ liệu vừa gõ —
                  đóng hộp thoại lúc lưu hỏng là bắt người dùng gõ lại từ đầu. */
