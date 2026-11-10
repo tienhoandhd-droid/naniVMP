@@ -44,6 +44,9 @@
     return host;
   }
 
+  // C7 (10/11): lỗi không gắn ô nào (vd. "chấm bằng công thức cũ — cần chấm lại") hiện nguyên lý do máy chủ.
+  const lyDoChung = list => (Array.isArray(list) ? list : []).filter(x => !(Array.isArray(x?.path) && x.path.length) && x?.reason).map(x => x.reason).join(' ');
+
   function hienThi() {
     const host = khung();
     host.hidden = !hoSo;
@@ -52,7 +55,7 @@
     host.dataset.trangThai = st?.trang_thai || '';
     $('ky-duyet-trang-thai').textContent = loiTai ? `Không tải được trạng thái ký: ${loiTai}`
       : !st ? 'Đang tải trạng thái ký…'
-      : `${TRANG_THAI[st.trang_thai] || st.trang_thai} · phiên bản v${st.version}${st.o_sai?.length ? ` · Còn ${st.o_sai.length} ô nhập sai — sửa trước khi ký` : ''}`;
+      : `${TRANG_THAI[st.trang_thai] || st.trang_thai} · phiên bản v${st.version}${lyDoChung(st.o_sai) ? ` · ${lyDoChung(st.o_sai)}` : st.o_sai?.length ? ` · Còn ${st.o_sai.length} ô nhập sai — sửa trước khi ký` : ''}`;
     $('ky-duyet-lich-su').replaceChildren(...(st?.rows || []).map(row => el('li', {
       text: [`${NHAN[row.y_nghia] || row.y_nghia} · ${row.ho_ten}`, luc(row.luc), `v${row.version}`,
         row.ma_deviation ? `Deviation ${row.ma_deviation}` : '', row.ly_do ? `Lý do: ${row.ly_do}` : ''].filter(Boolean).join(' · '),
@@ -76,6 +79,7 @@
       if (minh !== token) return;
       trangThai = null; loiTai = error?.message || 'Lỗi không rõ.';
       hienThi();
+      window.CPC1RunEntry?.reflect(); // C2: tải lỗi → khoá ô nhập (xem khoa bên dưới)
     }
   }
 
@@ -115,7 +119,7 @@
         // Máy chủ chặn ký khi còn ô nhập sai (INVALID_DATA kèm issues): báo số ô và để trang nhập đánh dấu từng ô.
         const oSai = Array.isArray(error?.issues) ? error.issues : [];
         const thongBao = String(error?.message || 'Không ký được.').trim();
-        loi.textContent = oSai.length ? `${/[.!?]$/.test(thongBao) ? thongBao : thongBao + '.'} Còn ${oSai.length} ô nhập sai — xem các ô được đánh dấu.` : thongBao;
+        loi.textContent = lyDoChung(oSai) ? lyDoChung(oSai) : oSai.length ? `${/[.!?]$/.test(thongBao) ? thongBao : thongBao + '.'} Còn ${oSai.length} ô nhập sai — xem các ô được đánh dấu.` : thongBao;
         if (oSai.length) window.dispatchEvent(new CustomEvent('cpc1:input-issues', { detail: oSai }));
       } finally {
         matKhau.value = '';
@@ -140,5 +144,6 @@
     void tai();
   }
 
-  window.CPC1KyDuyet = Object.freeze({ capNhat, get khoa() { return trangThai?.trang_thai === 'da_duyet'; } });
+  // C2 (10/11): đang tải hoặc tải lỗi trạng thái ký → coi như khoá (nghiêng về an toàn).
+  window.CPC1KyDuyet = Object.freeze({ capNhat, get khoa() { return Boolean(hoSo) && (!trangThai || trangThai.trang_thai === 'da_duyet'); } });
 })();

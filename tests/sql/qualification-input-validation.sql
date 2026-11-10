@@ -311,10 +311,13 @@ begin
   set local role authenticated;
   perform pg_temp.as_user(1);
   r := public.cpc1_record_signatures(rec);
-  perform pg_temp.ok('R1 cpc1_record_signatures tính lại: o_sai rỗng, ket_qua pass dù kết quả lưu cũ là invalid',
-    jsonb_array_length(r->'o_sai') = 0 and r->>'ket_qua' = 'pass', r::text);
+  -- C7 (10/11, migration 20261110170000): PDF in kết quả ĐÃ LƯU nên lưu ≠ tính lại thì chặn ký, cần chấm lại.
+  perform pg_temp.ok('R1 cpc1_record_signatures: kết quả lưu cũ khác tính lại → o_sai báo cần chấm lại (ket_qua vẫn theo tính lại)',
+    r->>'ket_qua' = 'pass' and exists (select 1 from jsonb_array_elements(r->'o_sai') x
+      where x->>'rule' = 'evaluation_error' and strpos(x->>'reason', 'cần chấm lại trước khi ký') > 0), r::text);
   r := pg_temp.sign(rec, 'kiem_tra');
-  perform pg_temp.ok('R2 ký kiểm tra không cần deviation (không báo nhầm KPH)', r->>'ok' = 'true', r::text);
+  perform pg_temp.ok('R2 ký kiểm tra bị chặn INVALID_DATA cho tới khi chấm lại (không tự chấm lại)',
+    r->>'error_code' = 'INVALID_DATA', r::text);
   perform pg_temp.ok('R3 ký không ghi lại kết quả đã lưu (revision giữ nguyên)', pg_temp.nrev(rec) = v
     and pg_temp.stored_overall(rec, v) = 'invalid', 'stored=' || coalesce(pg_temp.stored_overall(rec, v), 'null'));
 end $$;

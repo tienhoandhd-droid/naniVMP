@@ -41,8 +41,10 @@ export async function checkRecovery(page, base, fixtures) {
   await page.waitForFunction(()=>document.querySelector('#local-draft-status').textContent.startsWith('Đã lưu tạm'));
   await page.evaluate(()=>window.CPC1Recovery.end());
   await page.reload();await page.waitForFunction(()=>!document.querySelector('#evaluate').disabled);
-  assert.equal(await page.locator('#local-draft-enable').isChecked(),false,'Signout clears device recovery');
-  assert.equal(await page.locator('#local-draft-restore').isVisible(),false);
+  // C1 (10/11): kết thúc phiên lưu nốt bản tạm và giữ cho đúng tài khoản (không xoá).
+  assert.equal(await page.locator('#local-draft-enable').isChecked(),true,'Signout keeps device recovery for the same account');
+  assert.equal(await page.locator('#local-draft-restore').isVisible(),true);
+  await page.locator('#local-draft-clear').click();await page.locator('#local-draft-restore').waitFor({state:'hidden'});
  }
  // Reject unexpected fields and cross-system import before replacing current raw data.
  await page.goto(base+'/tham-dinh-thuc-te/gas.html?system=air');await page.waitForFunction(()=>!document.querySelector('#evaluate').disabled);
@@ -74,10 +76,10 @@ export async function checkRecovery(page, base, fixtures) {
  assert.equal(await second.locator('#local-draft-enable').count(),0,'Read-only user cannot access recovery');
  await second.evaluate(()=>localStorage.removeItem('test-readonly'));await second.close();
  await page.evaluate(async()=>{for(const cb of uiTest.listeners)cb('SIGNED_OUT',null);await window.CPC1Recovery.end();});
- await page.reload();await page.locator('#local-draft-enable').waitFor();assert.equal(await page.locator('#local-draft-restore').isVisible(),false);
+ await page.reload();await page.locator('#local-draft-enable').waitFor();assert.equal(await page.locator('#local-draft-restore').isVisible(),true,'C1: signout keeps the account draft');
  // Blocked device storage degrades to explicit JSON download without breaking form entry.
  await page.addInitScript(()=>{Object.defineProperty(window,'indexedDB',{get(){throw new DOMException('blocked','SecurityError');}});});
  await page.reload();await page.waitForFunction(()=>document.querySelector('#local-draft-status')?.textContent.includes('Không mở được'));
  await page.locator('#form-body input').first().fill('44');assert.equal(await page.locator('#form-body input').first().inputValue(),'44');
- console.log('Recovery UI: 3 systems raw input/reload/manual restore/offline capture/saved-only PDF/scoped signout passed.');
+ console.log('Recovery UI: 3 systems raw input/reload/manual restore/offline capture/saved-only PDF/signout keeps account draft passed.');
 }

@@ -23,6 +23,7 @@ function dung(printLogResult) {
       if (name === 'cpc1_context') return { data: context };
       if (name === 'cpc1_run_save') return { data: structuredClone(snapshot) };
       if (name === 'cpc1_load') return { data: structuredClone(snapshot) };
+      if (name === 'cpc1_run_load') return { data: structuredClone(snapshot) };
       if (name === 'cpc1_print_log') return printLogResult;
       return { data: null };
     },

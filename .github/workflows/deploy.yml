@@ -149,6 +149,7 @@ jobs:
             node tests/e2e/qualification-audit-trail.mjs &&
             node tests/e2e/qualification-trend-levels.mjs &&
             node tests/e2e/qualification-signing.mjs &&
+            node tests/e2e/qualification-ban-tam-het-phien.mjs &&
             node tests/e2e/qualification-overview.mjs &&
             node tests/e2e/long-mon-presentation.mjs &&
             node scripts/check-long-mon-release.mjs &&

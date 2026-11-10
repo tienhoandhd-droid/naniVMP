@@ -36,5 +36,5 @@ for (const mismatch of ['version','id','data']) test(`PDF rejects a mismatched $
  const client=authenticated({rpc:async(name,args)=>{calls.push([name,args]);if(name==='cpc1_run_save')return {data:structuredClone(snapshot)};const wrong=structuredClone(snapshot);if(mismatch==='version')wrong.version=2;if(mismatch==='id')wrong.id='record-b';if(mismatch==='data')wrong.data.meta.remarks='different';return {data:wrong};},storage:{from:()=>({download:async()=>{downloads++;throw Error('must not download')}})}});
  const api=makeBackend(settings,client);api.bindSystem('steam');api.bindRun(run,record);await api.save(snapshot.data);
  await assert.rejects(api.report('bm01',snapshot.data),/Phiên bản hồ sơ trả về không khớp/);
- assert.deepEqual(calls.at(-1),['cpc1_load',{p_record_id:'record-a',p_version:3}]);assert.equal(downloads,0);
+ assert.deepEqual(calls.at(-1),['cpc1_run_load',{p_run_id:run,p_record_id:'record-a'}]);assert.equal(downloads,0);
 });

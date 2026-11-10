@@ -32,12 +32,13 @@
   // Hạn dùng (dụng cụ dùng một lần): lấy lại từ đợt gần nhất cùng năm nếu hạn chưa qua ngày bắt đầu.
   const carriedExpiry=(requirements,runs,startedOn)=>{const out={};if(!validDate(startedOn))return out;const earlier=(runs||[]).filter(run=>String(run.started_on||'').slice(0,4)===startedOn.slice(0,4)).sort((a,b)=>String(b.started_on).localeCompare(String(a.started_on)));(requirements||[]).filter(item=>item.kind==='expiry').forEach(item=>{for(const run of earlier){const match=(run.calibration_requirements||[]).find(req=>sharedId(req)===sharedId(item)),value=match&&run.calibration?.[match.key];if(value?.name&&validDate(value.due_on)&&value.due_on>=startedOn){out[item.key]={name:value.name,due_on:value.due_on,from:run.title};break;}}});return out;};
   const trendRoute=search=>{const params=new URLSearchParams(search),system=params.get('system');return params.get('view')==='trend'&&Object.hasOwn(systems,system)?{dedicated:true,system}:{dedicated:false,system:null};};
-  const closedTrendHistory=(history,runs,system)=>{const closed=new Set((runs||[]).filter(run=>run.status!=='open').map(run=>run.id));return (history||[]).filter(item=>item.system===system&&closed.has(item.run_id));};
+  // C3 (10/11): kèm ngày bắt đầu đợt để so ngưỡng theo ngày khi số liệu không có ngày đo.
+  const closedTrendHistory=(history,runs,system)=>{const closed=new Map((runs||[]).filter(run=>run.status!=='open').map(run=>[run.id,run]));return (history||[]).filter(item=>item.system===system&&closed.has(item.run_id)).map(item=>({...item,started_on:closed.get(item.run_id).started_on}));};
   const monthRange = (months) => { if (!months.length) return []; const out = [], d = new Date(`${months[0]}T00:00:00Z`), end = months.at(-1); while (d.toISOString().slice(0, 10) <= end) { out.push(d.toISOString().slice(0, 8) + '01'); d.setUTCMonth(d.getUTCMonth() + 1); } return out; };
   const trendSeries = (history, system, form, point, metric, unit) => {
     const allMonths = history.map(h => h.period).filter(Boolean).sort();
     const candidates = history.filter(h => h.system === system)
-      .flatMap(h => (h.trend || []).map(row => ({ ...row, period: h.period, record_id:h.record_id, version:h.version })))
+      .flatMap(h => (h.trend || []).map(row => ({ ...row, period: h.period, record_id:h.record_id, version:h.version, date: [row.measured_on, h.started_on, h.period].find(validDate) || null })))
       .filter(r => r.form === form && (!point || r.point_id === point) && r.metric === metric);
     const selectedUnit = unit ?? candidates[0]?.unit ?? '';
     const rows = candidates.filter(r => (r.unit || '') === selectedUnit);
@@ -50,7 +51,7 @@
       return trials.flatMap(trial => {
         const buckets = months.map(month => pointRows.filter(r => r.period === month && (r.trial ?? 1) === trial));
         const count = Math.max(0,...buckets.map(b => b.length));
-        return Array.from({length:count},(_,occurrence) => ({point_id,trial,occurrence,values:buckets.map(b => b[occurrence]?.value ?? null)}));
+        return Array.from({length:count},(_,occurrence) => ({point_id,trial,occurrence,values:buckets.map(b => b[occurrence]?.value ?? null),dates:buckets.map(b => b[occurrence]?.date ?? null)}));
       });
     });
     return { months, points, series, values: series[0]?.values || months.map(() => null), excluded: rows.length-valid.length,
@@ -228,13 +229,13 @@
       means.forEach((value,monthIndex)=>{if(Number.isFinite(value))segment.push({index:monthIndex,value});else flush();});flush();
     });
     data.series.forEach(series=>{
-      series.values.forEach((value,monthIndex)=>{if(Number.isFinite(value)){const muc=T.classify(value,T.levelFor(levels,form,metric,data.unit,series.point_id,data.months[monthIndex])),title=`${data.months[monthIndex].slice(5,7)}/${data.months[monthIndex].slice(0,4)} · ${pointLabel(system,form,series.point_id)} · lần ${series.trial}${series.occurrence?' · chuỗi '+(series.occurrence+1):''}: ${value} ${data.unit}${{ok:'',alert:' · vượt mức cảnh báo',action:' · vượt mức hành động'}[muc]}`;group.append(el('circle',{...observationProps(series.point_id,title),cx:x(monthIndex),cy:y(value),r:muc==='ok'?4:6,'data-muc':muc,className:`multi-point ${colour(series.point_id)}${{ok:'',alert:' vuot-canh-bao',action:' vuot-hanh-dong'}[muc]}`},[el('title',{text:title})]));}});
+      series.values.forEach((value,monthIndex)=>{if(Number.isFinite(value)){const muc=T.classify(value,T.levelFor(levels,form,metric,data.unit,series.point_id,series.dates[monthIndex]||data.months[monthIndex])),title=`${data.months[monthIndex].slice(5,7)}/${data.months[monthIndex].slice(0,4)} · ${pointLabel(system,form,series.point_id)} · lần ${series.trial}${series.occurrence?' · chuỗi '+(series.occurrence+1):''}: ${value} ${data.unit}${{ok:'',alert:' · vượt mức cảnh báo',action:' · vượt mức hành động'}[muc]}`;group.append(el('circle',{...observationProps(series.point_id,title),cx:x(monthIndex),cy:y(value),r:muc==='ok'?4:6,'data-muc':muc,className:`multi-point ${colour(series.point_id)}${{ok:'',alert:' vuot-canh-bao',action:' vuot-hanh-dong'}[muc]}`},[el('title',{text:title})]));}});
     });
     if(!values.length)group.append(el('text',{x:width/2,y:130,'text-anchor':'middle',className:'chart-empty',text:'Chưa có số liệu từ đợt đã đóng phù hợp.'}));
     $('multi-trend-status').textContent=data.series.length?`${$('history-metric').selectedOptions[0]?.textContent||'Chỉ tiêu đã chọn'} · ${history.length} hồ sơ đã đóng · ${seriesPoints.length} điểm lấy mẫu${data.excluded?' · '+data.excluded+' kết quả thiếu hoặc chưa chắc chắn không được vẽ':''}.`:'Chưa có số liệu từ đợt đã đóng cho lựa chọn này.';
     $('multi-trend-legend').replaceChildren(...seriesPoints.map(id=>el('li',{},[el('span',{className:`multi-swatch ${colour(id)}`,'aria-hidden':'true'}),el('span',{text:pointLabel(system,form,id)})])),...(limits.length?[el('li',{},[el('span',{className:'multi-swatch limit-swatch','aria-hidden':'true'}),el('span',{text:'Giới hạn PQ (theo hồ sơ đang xem)'})])]:[]),...(levelLines.length?[el('li',{},[el('span',{className:'multi-swatch alert-swatch','aria-hidden':'true'}),el('span',{text:'Mức cảnh báo'})]),el('li',{},[el('span',{className:'multi-swatch action-swatch','aria-hidden':'true'}),el('span',{text:'Mức hành động'})])]:[]));
     // Annex 1 §9.11: báo vượt hành động và vượt cảnh báo lặp lại (≥2 đợt liên tiếp) tại cùng điểm.
-    const signals=levelLines.length?T.signals(seriesPoints.map(id=>({label:pointLabel(system,form,id),months:data.months.map((month,i)=>{const lv=T.levelFor(levels,form,metric,data.unit,id,month),vals=data.series.filter(series=>series.point_id===id).map(series=>series.values[i]).filter(Number.isFinite);return {month,state:lv&&vals.length?vals.map(v=>T.classify(v,lv)).sort((a,b)=>rank[b]-rank[a])[0]:null};})}))):[];
+    const signals=levelLines.length?T.signals(seriesPoints.map(id=>({label:pointLabel(system,form,id),months:data.months.map((month,i)=>{const states=data.series.filter(series=>series.point_id===id&&Number.isFinite(series.values[i])).map(series=>{const lv=T.levelFor(levels,form,metric,data.unit,id,series.dates[i]||month);return lv?T.classify(series.values[i],lv):null;}).filter(Boolean);return {month,state:states.length?states.sort((a,b)=>rank[b]-rank[a])[0]:null};})}))):[];
     $('multi-trend-signals').replaceChildren(...(levelLines.length&&!signals.length?[{muc:'ok',text:'Không có điểm vượt mức cảnh báo.'}]:signals).map(item=>el('li',{'data-muc':item.muc,text:item.text})));
     renderLevels(system,form,metric,data);
     // The table is an alternative to the chart: preserve every saved source row,

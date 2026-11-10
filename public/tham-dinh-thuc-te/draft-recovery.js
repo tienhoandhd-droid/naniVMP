@@ -22,7 +22,7 @@
   function panel() {
     if ($('local-draft-panel')) return;
     const section = document.createElement('section');section.id='local-draft-panel';section.className='local-draft-panel';section.setAttribute('aria-label','Bản tạm trên máy');
-    section.innerHTML='<div class="draft-switch"><label><input id="local-draft-enable" type="checkbox" aria-describedby="local-draft-help"> Tự lưu tạm trên máy này</label><span id="local-draft-status" role="status">Tự lưu tạm đang bật</span></div><p id="local-draft-help">Nhập đến đâu lưu tạm đến đó; bấm Lưu để đưa lên hệ thống. Bản tạm không mã hoá, tự xoá khi đăng xuất — máy dùng chung nên tắt.</p><div class="draft-recovery-actions"><button id="local-draft-restore" type="button" hidden>Khôi phục bản đang nhập</button><button id="local-draft-clear" type="button" hidden>Xóa bản tạm trên máy</button></div>';
+    section.innerHTML='<div class="draft-switch"><label><input id="local-draft-enable" type="checkbox" aria-describedby="local-draft-help"> Tự lưu tạm trên máy này</label><span id="local-draft-status" role="status">Tự lưu tạm đang bật</span></div><p id="local-draft-help">Nhập đến đâu lưu tạm đến đó; bấm Lưu để đưa lên hệ thống. Bản tạm không mã hoá, chỉ tài khoản này mở lại được — máy dùng chung nên tắt.</p><div class="draft-recovery-actions"><button id="local-draft-restore" type="button" hidden>Khôi phục bản đang nhập</button><button id="local-draft-clear" type="button" hidden>Xóa bản tạm trên máy</button></div>';
     document.querySelector('.action-bar, .actionbar').after(section);
     $('local-draft-enable').addEventListener('change', async () => {
       if (!active || !allowed()) return;
@@ -108,11 +108,25 @@
     });return queue;
   }
   async function transition(){const a=active;const pending=flush();clearTimeout(timer);active=null;await pending;if(a)a.ended=true;}
+  // C1 (10/11): hết phiên / mất quyền → lưu nốt bản tạm rồi đóng, KHÔNG xoá. Bản tạm gắn
+  // scope=[url,userId] nên tài khoản khác không đọc được; nút "Xóa bản tạm" vẫn xoá tay.
+  // Không qua allowed(): lúc này phiên đã kết thúc hoặc quyền đã mất, chỉ ghi vào máy này.
+  function finalWrite(a) {
+    if(a.failed || !a.enabled || a.candidate)return queue;
+    const current=adapter.get();
+    if(storageSystem(current)!==a.system || current.userId!==a.actor || !current.dirty)return queue;
+    const payload=structuredClone(current.snapshot);
+    queue=queue.catch(()=>{}).then(async()=>{
+      try{const row=await store.write(a.scope,a.system,a.revision,payload,true);a.revision=row.revision;}
+      catch(e){console.error('[CPC1] Không lưu nốt được bản tạm khi kết thúc phiên:',e);}
+    });
+    return queue;
+  }
   async function end() {
     const a=active;if(!a)return;
-    a.ended=true;clearTimeout(timer);active=null;window.removeEventListener('beforeunload',warnLeave);window.CPC1EntryTools?.end();
-    await queue.catch(()=>{});
-    try{await store.clearActor(a.scope);}catch{status('Chưa xóa được bản tạm. Xóa dữ liệu trang trong trình duyệt trên máy dùng chung.');}
+    clearTimeout(timer);const pending=finalWrite(a);
+    a.ended=true;active=null;window.removeEventListener('beforeunload',warnLeave);window.CPC1EntryTools?.end();
+    await pending;
     $('local-draft-panel')?.remove();
   }
   window.addEventListener('cpc1:permissions',()=>{if(active&&!allowed())void end();});

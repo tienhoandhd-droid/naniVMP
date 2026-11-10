@@ -67,10 +67,11 @@
   // Annex 1 §9.9: đặt từ dữ liệu thẩm định, xem lại định kỳ; §6.14: vượt cảnh
   // báo phải ghi nhận, vượt hành động phải điều tra. Máy chỉ so và GỢI Ý.
   const directionOf=(system,form,metric)=>(system==='steam'?steam:gas)[form]?.[metric]?.[1]||null;
-  // Ngưỡng có hiệu lực cho một tháng (month = 'YYYY-MM…'; bỏ trống = bản mới nhất).
+  // Ngưỡng có hiệu lực tại một ngày (date = 'YYYY-MM-DD': ngày đo, không có thì ngày bắt đầu đợt;
+  // bỏ trống = bản mới nhất). C3 (10/11): so đủ ngày — ngưỡng hiệu lực 20/10 không áp cho số đo 01/10.
   // Ưu tiên ngưỡng riêng của điểm, không có thì dùng ngưỡng chung của chỉ tiêu.
-  function levelFor(levels,form,metric,unit,pointId,month) {
-    const pick=point=>(levels||[]).filter(l=>l.form===form&&l.metric===metric&&l.unit===unit&&l.point_id===point&&(!month||String(l.hieu_luc_tu).slice(0,7)<=String(month).slice(0,7)))
+  function levelFor(levels,form,metric,unit,pointId,date) {
+    const pick=point=>(levels||[]).filter(l=>l.form===form&&l.metric===metric&&l.unit===unit&&l.point_id===point&&(!date||String(l.hieu_luc_tu).slice(0,10)<=String(date).slice(0,10)))
       .sort((a,b)=>b.phien_ban-a.phien_ban)[0]||null;
     return (pointId&&pick(pointId))||pick('');
   }

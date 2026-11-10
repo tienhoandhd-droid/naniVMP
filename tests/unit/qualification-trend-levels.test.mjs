@@ -12,11 +12,20 @@ const muc = (point_id, phien_ban, hieu_luc_tu, alert, action, direction = 'max')
 test('chọn đúng phiên bản theo tháng; ngưỡng riêng của điểm thắng ngưỡng chung', () => {
   const levels = [muc('', 1, '2026-01-01', 100, 200), muc('', 2, '2026-09-15', 80, 150), muc('P2', 1, '2026-01-01', 50, 90)];
   assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', '2026-08').phien_ban, 1, 'trước ngày hiệu lực bản 2 thì dùng bản 1');
-  assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', '2026-09').alert, 80, 'bản 2 hiệu lực từ giữa tháng 9');
+  assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', '2026-09-15').alert, 80, 'bản 2 hiệu lực từ giữa tháng 9');
+  assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', '2026-09-14').phien_ban, 1, 'C3: ngày trước hiệu lực cùng tháng vẫn dùng bản 1');
   assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', null).phien_ban, 2, 'không chỉ tháng thì lấy bản mới nhất');
   assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P2', '2026-10').alert, 50);
   assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/L', 'P1', null), null, 'khác đơn vị thì không áp');
   assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', '2025-12'), null, 'chưa có ngưỡng hiệu lực');
+});
+
+test('C3 (10/11): ngưỡng so theo NGÀY đầy đủ — đợt đo 01/10 không dùng ngưỡng hiệu lực từ 20/10', () => {
+  const levels = [muc('', 1, '2026-01-01', 100, 200), muc('', 2, '2026-10-20', 80, 150)];
+  assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', '2026-10-01').phien_ban, 1, 'trước ngày hiệu lực trong cùng tháng');
+  assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', '2026-10-19').phien_ban, 1);
+  assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', '2026-10-20').phien_ban, 2, 'đúng ngày hiệu lực');
+  assert.equal(api.levelFor(levels, 'bm01', 'p05', 'hạt/m³', 'P1', '2026-11-02').phien_ban, 2);
 });
 
 test('so sánh hai chiều; bằng ngưỡng chưa tính là vượt', () => {

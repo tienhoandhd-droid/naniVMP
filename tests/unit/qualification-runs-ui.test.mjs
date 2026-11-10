@@ -200,3 +200,16 @@ test('point detail: steam lists each trial with the computed print result; a sin
   withSelect.evaluation.source_context.config.forms[1].fields.unshift({ key: 'appearance', type: 'select', label: 'Cảm quan', options: [{ label: 'Trong, không màu, không mùi', value: 'pass' }] });
   assert.deepEqual(plain(ui.pointDetail('steam', withSelect, 'bm02', 'S1')).groups[0].rows[0], { label: 'Cảm quan', value: 'Trong, không màu, không mùi', unit: '' }, 'trường chọn hiện nhãn, không hiện mã');
 });
+
+test('C3 (10/11): mỗi số liệu xu hướng mang ngày đo; thiếu ngày đo thì dùng ngày bắt đầu đợt', () => {
+  const row = (point, value, extra = {}) => ({ form: 'bm01', point_id: point, metric: 'p05', unit: 'hạt/m³', value, ...extra });
+  const runs = [{ id: 'r1', status: 'closed', started_on: '2026-10-05' }, { id: 'r2', status: 'open', started_on: '2026-10-25' }];
+  const history = [
+    { system: 'air', run_id: 'r1', period: '2026-10-01', trend: [row('A', 10, { measured_on: '2026-10-21' }), row('B', 20)] },
+    { system: 'air', run_id: 'r2', period: '2026-10-01', trend: [row('A', 30, { measured_on: '2026-10-26' })] },
+  ];
+  const closed = ui.closedTrendHistory(history, runs, 'air');
+  assert.equal(closed.length, 1);
+  const out = ui.trendSeries(closed, 'air', 'bm01', null, 'p05', 'hạt/m³');
+  assert.deepEqual(plain(out.series.map(s => [s.point_id, s.values, s.dates])), [['A', [10], ['2026-10-21']], ['B', [20], ['2026-10-05']]]);
+});

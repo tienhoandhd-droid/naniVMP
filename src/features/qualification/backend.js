@@ -5,6 +5,18 @@ import { createClient } from '@supabase/supabase-js';
 // có giá trị ở lần chạy đầu). ?v= đổi theo nội dung gói để không dính cache cũ.
 const cloudScriptSrc = typeof document !== 'undefined' ? document.currentScript?.src : undefined;
 let pdfBundle = null;
+// C5 (10/11): kết quả lọc theo phạm vi đợt (scoped_evaluation) không có summary.failed_codes
+// mà mẫu in khí đọc. Ghép lại từ trạng thái từng điểm trong phạm vi, theo thứ tự cấu hình —
+// cùng cách evaluate_gas ghép (chỉ điểm "fail"). Không đổi kết luận, không đổi mẫu in.
+function withFailedCodes(evaluation) {
+  const forms = { ...evaluation?.forms };
+  for (const [id, form] of Object.entries(forms)) {
+    if (!form?.summary || !form.locations || Object.hasOwn(form.summary, 'failed_codes')) continue;
+    const order = evaluation.source_context?.config?.forms?.find(f => f.id === id)?.locations?.map(l => l.id) || Object.keys(form.locations);
+    forms[id] = { ...form, summary: { ...form.summary, failed_codes: order.filter(point => form.locations[point] === 'fail').join(', ') } };
+  }
+  return { ...evaluation, forms };
+}
 function loadPdfBundle() {
   if (window.CPC1Pdf) return Promise.resolve(window.CPC1Pdf);
   pdfBundle ??= new Promise((resolve, reject) => {
@@ -249,7 +261,10 @@ export function makeBackend(settings, existingClient, makeSigningClient) {
       if(!(gas?/^bm0[1-7]$/:/^bm0[1-5]$/).test(form))throw new Error('Biểu mẫu không hợp lệ.');
       if(!current || canonical(data)!==canonical(current.data))throw new Error('Lưu hồ sơ trước khi in để bản in dùng đúng dữ liệu đã lưu.');
       const expected={id:current.id,version:current.version,data:canonical(data)};
-      const snapshot=await rpc('cpc1_load',{p_record_id:expected.id,p_version:expected.version});
+      // C5 (10/11): trong đợt, in kết quả đã lọc theo phạm vi đợt — cùng nguồn cpc1_run_load đang hiển thị.
+      // C6 (10/11): đọc phiên bản hiện hành trên máy chủ; đã có bản mới hơn thì không in bản cũ.
+      const snapshot=runBinding?await rpc('cpc1_run_load',{p_run_id:runBinding.runId,p_record_id:expected.id}):await rpc('cpc1_load',{p_record_id:expected.id});
+      if(snapshot?.id===expected.id&&Number.isSafeInteger(snapshot?.version)&&snapshot.version>expected.version)throw new Error(`Hồ sơ đã có phiên bản ${snapshot.version} mới hơn. Tải lại rồi in.`);
       if(snapshot?.id!==expected.id || snapshot?.version!==expected.version || canonical(snapshot?.data)!==expected.data)throw new Error('Phiên bản hồ sơ trả về không khớp bản đã lưu. Không tạo PDF.');
       const ctx=snapshot.evaluation.source_context;
       if(gas && (snapshot.data.system!==data.system || ctx?.config?.system!==data.system || !ctx.config.forms.some(f=>f.id===form)))throw new Error('Hệ thống hoặc biểu mẫu không khớp phiên bản đã lưu.');
@@ -257,7 +272,7 @@ export function makeBackend(settings, existingClient, makeSigningClient) {
       if(!ctx?.template_sha256?.[form] || !ctx?.asset_sha256?.['print-layout.json'] || Object.values(fontFiles).some(name=>!ctx?.asset_sha256?.[name]))throw new Error('Phiên bản hồ sơ thiếu định danh mẫu in đúng định dạng gốc.');
       const [template,layoutBytes,...fontBytes]=await Promise.all([download(`${form}.pdf`,ctx.asset_path),download('print-layout.json',ctx.asset_path),...Object.values(fontFiles).map(name=>download(name,ctx.asset_path))]);
       const fonts=Object.fromEntries(Object.keys(fontFiles).map((key,i)=>[key,fontBytes[i]]));
-      const evaluation={...snapshot.evaluation,report_context:{id:snapshot.id,version:snapshot.version,created_at:snapshot.created_at}};
+      const evaluation={...(runBinding&&gas?withFailedCodes(snapshot.evaluation):snapshot.evaluation),report_context:{id:snapshot.id,version:snapshot.version,created_at:snapshot.created_at}};
       const pdf=await loadPdfBundle();const renderer=gas?pdf.renderGasPdf:pdf.renderPdf;
       const bytes=await renderer(form,snapshot.data,evaluation,{template,layoutBytes,fonts});
       // Annex 11 §9 / PIC/S PI 041: bản in phải truy vết được (ai in, bản nào).
