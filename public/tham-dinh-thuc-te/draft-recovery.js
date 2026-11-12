@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const store = window.CPC1DraftStore;
-  let adapter, active, timer, subscription, queue = Promise.resolve();
+  let adapter, active, timer, subscription, notice = false, queue = Promise.resolve();
   const $ = id => document.getElementById(id);
   const allowed = () => {
     const system=adapter?.get().system;
@@ -9,27 +9,25 @@
   };
   const storageSystem = s => s.runId ? s.system+':'+s.runId : s.system;
   const time = value => new Date(value).toLocaleString('vi-VN');
-  const status = text => { if ($('local-draft-status')) $('local-draft-status').textContent = text; };
+  // 12/11 (chủ dự án): lưu tạm LUÔN bật, không còn ô bật/tắt. Khối bản tạm ẩn khi mọi thứ bình thường;
+  // chỉ hiện khi có bản tạm cũ cần khôi phục/xoá, khi lưu tạm lỗi, hoặc ngay sau một thao tác cần báo (show=true).
+  const quiet = () => { const box = $('local-draft-panel'); if (!box) return; const an = !(active?.candidate || active?.failed || notice); box.dataset.quiet = String(an); box.style.display = an ? 'none' : ''; };
+  const status = (text, show = false) => { if ($('local-draft-status')) $('local-draft-status').textContent = text; notice = show; quiet(); };
   const warnLeave=event=>{if(window.CPC1Embedded?.navigationApproved())return;event.preventDefault();event.returnValue='';};
   function sync() {
     if(adapter?.get().dirty&&!window.CPC1_SESSION_ENDED)window.addEventListener('beforeunload',warnLeave);else window.removeEventListener('beforeunload',warnLeave);
     window.dispatchEvent(new Event('cpc1:entry-change'));
     if (!active || !allowed()) return;
-    $('local-draft-enable').checked = active.enabled;
     $('local-draft-restore').hidden = !active.candidate;
-    $('local-draft-clear').hidden = !active.enabled && !active.candidate;
+    $('local-draft-clear').hidden = !active.candidate;
+    quiet();
   }
   function panel() {
     if ($('local-draft-panel')) return;
     const section = document.createElement('section');section.id='local-draft-panel';section.className='local-draft-panel';section.setAttribute('aria-label','Bản tạm trên máy');
-    section.innerHTML='<div class="draft-switch"><label><input id="local-draft-enable" type="checkbox" aria-describedby="local-draft-help"> Tự lưu tạm trên máy này</label><span id="local-draft-status" role="status">Tự lưu tạm đang bật</span></div><p id="local-draft-help">Nhập đến đâu lưu tạm đến đó; bấm Lưu để đưa lên hệ thống. Bản tạm không mã hoá, chỉ tài khoản này mở lại được — máy dùng chung nên tắt.</p><div class="draft-recovery-actions"><button id="local-draft-restore" type="button" hidden>Khôi phục bản đang nhập</button><button id="local-draft-clear" type="button" hidden>Xóa bản tạm trên máy</button></div>';
-    document.querySelector('.action-bar, .actionbar').after(section);
-    $('local-draft-enable').addEventListener('change', async () => {
-      if (!active || !allowed()) return;
-      if (!$('local-draft-enable').checked) { await discard(false); return; }
-      active.enabled=true;sync();await flush(true);
-    });
-    $('local-draft-clear').addEventListener('click',()=>discard(true));
+    section.innerHTML='<span id="local-draft-status" role="status"></span><div class="draft-recovery-actions"><button id="local-draft-restore" type="button" hidden>Khôi phục bản đang nhập</button><button id="local-draft-clear" type="button" hidden>Xóa bản tạm trên máy</button></div>';
+    document.querySelector('.action-bar, .actionbar').after(section);quiet();
+    $('local-draft-clear').addEventListener('click',()=>discard());
     $('local-draft-restore').addEventListener('click', async () => {
       const a=active;if(!a?.candidate || !allowed())return;
       if(adapter.get().dirty && !confirm('Thay dữ liệu đang trên trang bằng bản tạm đã lưu trên máy?'))return;
@@ -40,7 +38,7 @@
         else await window.CPC1Backend.refreshAccess(system,window.CPC1Backend.runBinding?'archive-edit':'enter');
         await adapter.restore(snapshot);
         if(a!==active || a.ended)return;
-        a.candidate=null;sync();status('Đã khôi phục. Tính lại và lưu khi có mạng.');
+        a.candidate=null;sync();status('Đã khôi phục. Tính lại và lưu khi có mạng.',true);
         changed();
       } catch(e){status('Không khôi phục được: '+e.message+' Bản tạm vẫn được giữ.');}
     });
@@ -51,13 +49,13 @@
     const state=options.get(), scope=JSON.stringify([window.CPC1_SETTINGS?.url || location.origin,state.userId]);
     if(active?.scope===scope && active.system===storageSystem(state) && !active.ended){sync();return;}
     clearTimeout(timer);
-    const a={scope,system:storageSystem(state),actor:state.userId,revision:0,enabled:false,candidate:null,ended:false,failed:false};active=a;panel();
+    const a={scope,system:storageSystem(state),actor:state.userId,revision:0,candidate:null,ended:false,failed:false};active=a;notice=false;panel();
     try {
       const row=await store.read(scope,storageSystem(state));
       if(active!==a || a.ended || !allowed())return;
-      a.revision=row?.revision || 0;a.enabled=row?Boolean(row.enabled):true; // mặc định tự lưu; chỉ tắt khi người dùng đã tắt trên máy này
+      a.revision=row?.revision || 0; // luôn tự lưu, kể cả máy trước đây đã tắt (cờ enabled cũ trong bộ nhớ máy không còn dùng)
       a.candidate=row?.payload || null;
-      status(a.candidate?'Có bản đang nhập từ '+time(row.updatedAt)+'. Chọn khôi phục hoặc xóa bản tạm.':a.enabled?'Tự lưu tạm đang bật. Chưa có thay đổi mới.':'Tự lưu tạm đang tắt');sync();
+      status(a.candidate?'Có bản đang nhập từ '+time(row.updatedAt)+'. Chọn khôi phục hoặc xóa bản tạm.':'Chưa có thay đổi mới.');sync();
     } catch(e){a.failed=true;status('Không mở được bộ nhớ máy. Dùng Hồ sơ & tệp → Tải bản nháp.');sync();}
     if(!subscription && window.CPC1Backend.onSessionChange) subscription=window.CPC1Backend.onSessionChange((event,session)=>{
       if(active && (event==='SIGNED_OUT' || (event==='SIGNED_IN' && session?.user?.id!==active.actor))) void end();
@@ -65,14 +63,14 @@
   }
   function changed() {
     sync();clearTimeout(timer);
-    if(!active?.enabled || active.ended || active.failed || !allowed())return;
+    if(!active || active.ended || active.failed || !allowed())return;
     if(active.candidate){status('Có bản tạm cũ. Khôi phục hoặc xóa trước khi tự lưu dữ liệu mới.');return;}
     status('Đang chờ lưu tạm…');timer=setTimeout(()=>void flush(),250);
   }
   function flush(force=false) {
     clearTimeout(timer);
     const a=active;
-    if(!a || a.ended || a.failed || !a.enabled || a.candidate || !allowed())return queue;
+    if(!a || a.ended || a.failed || a.candidate || !allowed())return queue;
     const current=adapter.get();
     if(storageSystem(current)!==a.system || current.userId!==a.actor)return queue;
     if(!current.dirty && !force)return queue;
@@ -81,26 +79,26 @@
       if(a.ended || a.failed || !allowed())return;
       try {
         const row=await store.write(a.scope,a.system,a.revision,payload,true);a.revision=row.revision;
-        if(a===active&&!a.ended)status(adapter.get().generation!==current.generation?'Đang chờ lưu tạm…':payload?'Đã lưu tạm trên máy · '+time(row.updatedAt)+' · chưa lưu lên hệ thống':'Tự lưu tạm đang bật. Chưa có thay đổi mới.');
+        if(a===active&&!a.ended)status(adapter.get().generation!==current.generation?'Đang chờ lưu tạm…':payload?'Đã lưu tạm trên máy · '+time(row.updatedAt)+' · chưa lưu lên hệ thống':'Chưa có thay đổi mới.');
       } catch(e){a.failed=true;if(a===active)status(e.code==='DRAFT_CONFLICT'?e.message:'Không lưu được trên máy. Dữ liệu còn trên trang; hãy tải bản nháp JSON.');}
     });
     return queue;
   }
-  async function discard(keepEnabled) {
+  async function discard() {
     const a=active;if(!a)return;
-    if(!confirm(keepEnabled?'Xóa bản tạm của hệ thống này trên máy? Dữ liệu trên trang và hồ sơ đã lưu vẫn giữ nguyên.':'Tắt tự lưu và xóa bản tạm của hệ thống này trên máy? Dữ liệu trên trang và hồ sơ đã lưu vẫn giữ nguyên.')){sync();return;}
+    if(!confirm('Xóa bản tạm của hệ thống này trên máy? Dữ liệu trên trang và hồ sơ đã lưu vẫn giữ nguyên.')){sync();return;}
     clearTimeout(timer);await queue.catch(()=>{});
     if(a!==active || a.ended)return;
     try {
       // Re-read only for an explicit discard, never for an automatic conflicting write.
       const row=await store.read(a.scope,a.system);
-      const cleared=await store.write(a.scope,a.system,row?.revision || 0,null,keepEnabled);
-      a.revision=cleared.revision;a.enabled=keepEnabled;a.candidate=null;a.failed=false;sync();status(keepEnabled?'Đã xóa bản tạm trên máy. Tự lưu vẫn bật.':'Đã xóa bản tạm trên máy. Tự lưu đã tắt.');
-    } catch(e){status('Không xóa được bản tạm: '+e.message);sync();}
+      const cleared=await store.write(a.scope,a.system,row?.revision || 0,null,true);
+      a.revision=cleared.revision;a.candidate=null;a.failed=false;sync();status('Đã xóa bản tạm trên máy.',true);
+    } catch(e){status('Không xóa được bản tạm: '+e.message,true);sync();}
   }
   function accepted() {
     const a=active;clearTimeout(timer);sync();
-    if(!a?.enabled || a.ended || a.failed || a.candidate)return queue;
+    if(!a || a.ended || a.failed || a.candidate)return queue;
     queue=queue.catch(()=>{}).then(async()=>{
       if(a.ended || !allowed())return;
       try{const row=await store.write(a.scope,a.system,a.revision,null,true);a.revision=row.revision;if(a===active)status('Đã lưu. Bản tạm đã được dọn.');}
@@ -112,7 +110,7 @@
   // scope=[url,userId] nên tài khoản khác không đọc được; nút "Xóa bản tạm" vẫn xoá tay.
   // Không qua allowed(): lúc này phiên đã kết thúc hoặc quyền đã mất, chỉ ghi vào máy này.
   function finalWrite(a) {
-    if(a.failed || !a.enabled || a.candidate)return queue;
+    if(a.failed || a.candidate)return queue;
     const current=adapter.get();
     if(storageSystem(current)!==a.system || current.userId!==a.actor || !current.dirty)return queue;
     const payload=structuredClone(current.snapshot);

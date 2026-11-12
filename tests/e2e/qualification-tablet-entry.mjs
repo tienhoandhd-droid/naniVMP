@@ -310,14 +310,15 @@ try {
  assert.equal(await stampPage.locator(`[name="forms.bm01.${point}.executed_by"]`).inputValue(),'Nguyễn Văn Thử','performer shows the account name after saving');
  assert.equal(await stampPage.locator(`[name="forms.bm01.${point}.execution_date"]`).inputValue(),'26/10/2026 09:42','time shows date and time after saving');
  await stampPage.close();
- // Tự lưu tạm mặc định bật: gõ là lưu trên máy, không cần tích ô hay bấm Lưu; mở lại trang thì khôi phục được.
+ // Tự lưu tạm LUÔN bật (12/11: bỏ ô bật/tắt, ẩn khối khi bình thường): gõ là lưu trên máy; mở lại trang thì khôi phục được.
  const fresh=await browser.newContext({viewport:{width:1024,height:768}});
  const auto=await localPage(fresh);
  await auto.goto(`http://qualification.test/tham-dinh-thuc-te/gas.html?system=air&form=bm01&run=${open.id}&record=${open.items[0].record_id}`);
  await auto.locator('#entry-continue').click();
- assert.equal(await auto.locator('#local-draft-enable').isChecked(),true,'device autosave is on by default');
+ assert.equal(await auto.locator('#local-draft-enable').count(),0,'device autosave has no off switch');
  await auto.locator(`[name="forms.bm01.${point}.p5"]`).fill('7');
- await auto.locator('#local-draft-status').getByText(/Đã lưu tạm trên máy/).waitFor();
+ await auto.waitForFunction(()=>/Đã lưu tạm trên máy/.test(document.getElementById('local-draft-status')?.textContent||''));
+ assert.equal(await auto.locator('#local-draft-panel').isVisible(),false,'draft panel stays hidden while autosave works');
  await auto.reload();await auto.locator('#entry-continue').click();
  await auto.locator('#local-draft-restore').waitFor();
  await auto.locator('#local-draft-restore').click();

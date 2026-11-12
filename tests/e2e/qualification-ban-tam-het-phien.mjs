@@ -41,12 +41,15 @@ async function moVoi(nguoi) {
   await page.evaluate(n => sessionStorage.setItem('nguoi', n), nguoi);
   await page.goto(URL_THU);
   await page.evaluate(() => window.CPC1Recovery.start(window.__adapter));
-  await page.locator('#local-draft-status').waitFor(); // start() chờ đọc xong bộ nhớ máy rồi mới trả về
+  await page.locator('#local-draft-status').waitFor({ state: 'attached' }); // start() chờ đọc xong bộ nhớ máy rồi mới trả về
 }
 await page.goto(URL_THU);
 
 // 1) Gõ một ô rồi hết phiên NGAY (trước khi hẹn giờ 250 ms lưu tạm chạy) → bản tạm vẫn được lưu nốt, không bị xoá.
 await moVoi('user-a');
+// 12/11: lưu tạm luôn bật, không còn ô bật/tắt; bình thường thì cả khối ẩn đi.
+assert.equal(await page.locator('#local-draft-enable').count(), 0, 'không còn ô bật/tắt lưu tạm');
+assert.equal(await page.locator('#local-draft-panel').isVisible(), false, 'không có gì cần báo thì khối bản tạm ẩn');
 await page.evaluate(() => window.__go('12,345'));
 await page.evaluate(() => window.__hetPhien());
 await page.waitForFunction(() => !document.getElementById('local-draft-panel'));
@@ -57,6 +60,7 @@ assert.equal(await page.evaluate(() => window.__docBanTam('user-a')), '12,345', 
 await moVoi('user-a');
 await page.locator('#local-draft-status').getByText(/^Có bản đang nhập từ /).waitFor();
 assert.equal(await page.locator('#local-draft-restore').isVisible(), true);
+assert.equal(await page.locator('#local-draft-clear').isVisible(), true, 'có bản tạm cũ thì có nút xoá');
 await page.click('#local-draft-restore');
 await page.waitForFunction(() => window.__restored);
 assert.equal(await page.evaluate(() => window.__restored.data.meta.remarks), '12,345');
@@ -65,6 +69,7 @@ assert.equal(await page.evaluate(() => window.__restored.data.meta.remarks), '12
 await moVoi('user-b');
 assert.equal(await page.locator('#local-draft-restore').isVisible(), false, 'C1: tài khoản khác không thấy bản tạm');
 assert.doesNotMatch(await page.locator('#local-draft-status').textContent(), /Có bản đang nhập/);
+assert.equal(await page.locator('#local-draft-panel').isVisible(), false, 'người khác: không có bản tạm nên khối ẩn');
 assert.equal(await page.evaluate(() => window.__docBanTam('user-b')), null);
 
 // 4) Mất quyền nhập giữa chừng (cpc1:permissions) → cũng lưu nốt bản tạm của user-b, không xoá.
@@ -78,9 +83,32 @@ assert.equal(await page.evaluate(() => window.__docBanTam('user-a')), '12,345', 
 // 5) Nút "Xóa bản tạm trên máy" vẫn xoá tay được.
 await moVoi('user-a');
 await page.locator('#local-draft-clear').click();
-await page.locator('#local-draft-status').getByText('Đã xóa bản tạm trên máy. Tự lưu vẫn bật.').waitFor();
+await page.locator('#local-draft-status').getByText('Đã xóa bản tạm trên máy.', { exact: true }).waitFor();
 assert.equal(await page.evaluate(() => window.__docBanTam('user-a')), null);
+
+// 6) Máy trước đây đã TẮT tự lưu (bản ghi enabled=false) → nay vẫn tự lưu, không có đường tắt.
+await page.evaluate(async () => {
+  const scope = JSON.stringify(['https://vmp.test', 'user-c']), row = await window.CPC1DraftStore.read(scope, 'steam');
+  await window.CPC1DraftStore.write(scope, 'steam', row?.revision || 0, null, false);
+});
+await moVoi('user-c');
+assert.equal(await page.locator('#local-draft-panel').isVisible(), false);
+await page.evaluate(() => window.__go('9,1'));
+await page.waitForFunction(() => document.getElementById('local-draft-status').textContent.startsWith('Đã lưu tạm trên máy'));
+assert.equal(await page.evaluate(() => window.__docBanTam('user-c')), '9,1', 'máy từng tắt tự lưu nay vẫn lưu tạm');
+assert.equal(await page.locator('#local-draft-panel').isVisible(), false, 'lưu tạm bình thường thì không hiện gì');
+
+// 7) Bộ nhớ máy hỏng → phải HIỆN lời báo, không im lặng.
+// (moVoi tải lại trang nên phải làm hỏng indexedDB SAU khi tải, TRƯỚC khi start.)
+await page.evaluate(n => sessionStorage.setItem('nguoi', n), 'user-d');
+await page.goto(URL_THU);
+await page.evaluate(() => {
+  IDBFactory.prototype.open = () => { throw new Error('bộ nhớ máy hỏng (giả lập)'); };
+  return window.CPC1Recovery.start(window.__adapter);
+});
+await page.locator('#local-draft-status').getByText(/^Không mở được bộ nhớ máy/).waitFor();
+assert.equal(await page.locator('#local-draft-panel').isVisible(), true, 'lỗi lưu tạm thì khối hiện ra');
 
 assert.deepEqual(errors, []);
 await browser.close();
-console.log('PASS ban-tam-het-phien: hết phiên/mất quyền lưu nốt bản tạm đúng tài khoản, người khác không thấy, xoá tay vẫn được');
+console.log('PASS ban-tam-het-phien: hết phiên/mất quyền lưu nốt bản tạm đúng tài khoản, người khác không thấy, xoá tay vẫn được; luôn tự lưu, không ô bật/tắt, ẩn khi bình thường, hiện khi lỗi');

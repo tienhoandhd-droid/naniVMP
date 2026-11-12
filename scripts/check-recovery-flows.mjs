@@ -3,10 +3,9 @@ export async function checkRecovery(page, base, fixtures) {
  for (const system of ['steam','air','nitrogen']) {
   const url=base+'/tham-dinh-thuc-te/'+(system==='steam'?'steam.html':'gas.html?system='+system);
   await page.goto(url);await page.waitForFunction(()=>!document.querySelector('#evaluate').disabled);
-  assert.equal(await page.locator('#local-draft-enable').count(),1,'Device recovery control exists');
+  assert.equal(await page.locator('#local-draft-panel').count(),1,'Device recovery exists');assert.equal(await page.locator('#local-draft-enable').count(),0,'Autosave is always on: no switch');
   await page.locator('#draft-file').setInputFiles(fixtures+'/'+system+'.json');
   await page.waitForFunction(()=>[...document.querySelectorAll('#form-body input')].some(x=>x.value));
-  await page.locator('#local-draft-enable').check();
   const input=page.locator('#form-body input:not([readonly])').first();
   const name=await input.getAttribute('name');await input.fill('12,345');
   await page.waitForFunction(()=>document.querySelector('#local-draft-status').textContent.startsWith('Đã lưu tạm'));
@@ -42,7 +41,7 @@ export async function checkRecovery(page, base, fixtures) {
   await page.evaluate(()=>window.CPC1Recovery.end());
   await page.reload();await page.waitForFunction(()=>!document.querySelector('#evaluate').disabled);
   // C1 (10/11): kết thúc phiên lưu nốt bản tạm và giữ cho đúng tài khoản (không xoá).
-  assert.equal(await page.locator('#local-draft-enable').isChecked(),true,'Signout keeps device recovery for the same account');
+  assert.equal(await page.locator('#local-draft-panel').count(),1,'Signout keeps device recovery for the same account');
   assert.equal(await page.locator('#local-draft-restore').isVisible(),true);
   await page.locator('#local-draft-clear').click();await page.locator('#local-draft-restore').waitFor({state:'hidden'});
  }
@@ -60,7 +59,7 @@ export async function checkRecovery(page, base, fixtures) {
  await page.waitForFunction(()=>!document.querySelector('#evaluate').disabled);
  await page.locator('#draft-file').setInputFiles(fixtures+'/steam.json');
  await page.waitForFunction(()=>[...document.querySelectorAll('#form-body input')].some(x=>x.value));
- await page.locator('#local-draft-enable').check();await page.locator('#form-body input').first().fill('41');
+ await page.locator('#form-body input').first().fill('41');
  await page.waitForFunction(()=>document.querySelector('#local-draft-status').textContent.startsWith('Đã lưu tạm'));
  const second=await page.context().newPage();second.on('dialog',d=>d.accept());
  await second.goto(steam);await second.locator('#local-draft-restore:visible').click();await second.locator('#form-body input').first().fill('42');
@@ -70,13 +69,13 @@ export async function checkRecovery(page, base, fixtures) {
  assert.equal(await page.locator('#form-body input').first().inputValue(),'43');
  await second.reload();await second.locator('#local-draft-restore:visible').click();assert.equal(await second.locator('#form-body input').first().inputValue(),'42');
  // Same origin, another account must not receive the first account's draft.
- await second.evaluate(()=>localStorage.setItem('test-actor','synthetic-other'));await second.reload();await second.locator('#local-draft-enable').waitFor();
+ await second.evaluate(()=>localStorage.setItem('test-actor','synthetic-other'));await second.reload();await second.locator('#local-draft-panel').waitFor({state:'attached'});
  assert.equal(await second.locator('#local-draft-restore').isVisible(),false);
  await second.evaluate(()=>{localStorage.removeItem('test-actor');localStorage.setItem('test-readonly','1');});await second.reload();await second.locator('#evaluate').waitFor();
- assert.equal(await second.locator('#local-draft-enable').count(),0,'Read-only user cannot access recovery');
+ assert.equal(await second.locator('#local-draft-panel').count(),0,'Read-only user cannot access recovery');
  await second.evaluate(()=>localStorage.removeItem('test-readonly'));await second.close();
  await page.evaluate(async()=>{for(const cb of uiTest.listeners)cb('SIGNED_OUT',null);await window.CPC1Recovery.end();});
- await page.reload();await page.locator('#local-draft-enable').waitFor();assert.equal(await page.locator('#local-draft-restore').isVisible(),true,'C1: signout keeps the account draft');
+ await page.reload();await page.locator('#local-draft-panel').waitFor({state:'attached'});assert.equal(await page.locator('#local-draft-restore').isVisible(),true,'C1: signout keeps the account draft');
  // Blocked device storage degrades to explicit JSON download without breaking form entry.
  await page.addInitScript(()=>{Object.defineProperty(window,'indexedDB',{get(){throw new DOMException('blocked','SecurityError');}});});
  await page.reload();await page.waitForFunction(()=>document.querySelector('#local-draft-status')?.textContent.includes('Không mở được'));
