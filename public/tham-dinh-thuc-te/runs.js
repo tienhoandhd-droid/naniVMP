@@ -33,7 +33,11 @@
   const carriedExpiry=(requirements,runs,startedOn)=>{const out={};if(!validDate(startedOn))return out;const earlier=(runs||[]).filter(run=>String(run.started_on||'').slice(0,4)===startedOn.slice(0,4)).sort((a,b)=>String(b.started_on).localeCompare(String(a.started_on)));(requirements||[]).filter(item=>item.kind==='expiry').forEach(item=>{for(const run of earlier){const match=(run.calibration_requirements||[]).find(req=>sharedId(req)===sharedId(item)),value=match&&run.calibration?.[match.key];if(value?.name&&validDate(value.due_on)&&value.due_on>=startedOn){out[item.key]={name:value.name,due_on:value.due_on,from:run.title};break;}}});return out;};
   const trendRoute=search=>{const params=new URLSearchParams(search),system=params.get('system');return params.get('view')==='trend'&&Object.hasOwn(systems,system)?{dedicated:true,system}:{dedicated:false,system:null};};
   // C3 (10/11): kèm ngày bắt đầu đợt để so ngưỡng theo ngày khi số liệu không có ngày đo.
-  const closedTrendHistory=(history,runs,system)=>{const closed=new Map((runs||[]).filter(run=>run.status!=='open').map(run=>[run.id,run]));return (history||[]).filter(item=>item.system===system&&closed.has(item.run_id)).map(item=>({...item,started_on:closed.get(item.run_id).started_on}));};
+  const closedTrendHistory=(history,runs,system)=>{const closed=new Map((runs||[]).filter(run=>run.status!=='open').map(run=>[run.id,run]));return (history||[]).filter(item=>item.system===system&&closed.has(item.run_id)&&!item.in_progress).map(item=>({...item,started_on:closed.get(item.run_id).started_on}));};
+  // 12/11: cpc1_history_list trả thêm hồ sơ của đợt đang mở (in_progress). Biểu đồ từng đợt cho xem,
+  // nhưng phải ghi rõ số liệu chưa chốt. Biểu đồ qua các đợt vẫn chỉ dùng closedTrendHistory.
+  const inProgressTag=item=>item?.in_progress?' · Đang nhập':'';
+  const inProgressNote=item=>item?.in_progress?'Đợt đang nhập, số liệu chưa chốt. ':'';
   const monthRange = (months) => { if (!months.length) return []; const out = [], d = new Date(`${months[0]}T00:00:00Z`), end = months.at(-1); while (d.toISOString().slice(0, 10) <= end) { out.push(d.toISOString().slice(0, 8) + '01'); d.setUTCMonth(d.getUTCMonth() + 1); } return out; };
   const trendSeries = (history, system, form, point, metric, unit) => {
     const allMonths = history.map(h => h.period).filter(Boolean).sort();
@@ -133,7 +137,7 @@
     groups = groups.filter(g => g.rows.length || g.issues.length);
     return { form: formConfig.title || form.toUpperCase(), point: snapshotPoint(system, config, form, point), status: pointStatus(system, snapshot?.evaluation, form, point), groups };
   };
-  window.CPC1RunsUI = { campaignScope, validateSingleScope, validateCalibration, calibrationGroups, carriedExpiry, trendRoute, closedTrendHistory, trendSeries, overviewSummary, pointGrid, pointDetail };
+  window.CPC1RunsUI = { campaignScope, validateSingleScope, validateCalibration, calibrationGroups, carriedExpiry, trendRoute, closedTrendHistory, inProgressTag, inProgressNote, trendSeries, overviewSummary, pointGrid, pointDetail };
   if (typeof document === 'undefined') return;
   const route=trendRoute(location.search);
   const $ = id => document.getElementById(id);
@@ -182,14 +186,14 @@
     const outside=annotated.filter(row=>['above','below'].includes(row.action.state)).length;
     const unknown=annotated.filter(row=>row.action.state==='unknown').length;
     const run=state.runs.find(run=>run.id===item?.run_id);
-    $('assessment-scope').dataset.recordScope=item?`${item.period.slice(0,7)} · ${run?.title||'Hồ sơ đã lưu'} · v${item.version}`:'Chưa có hồ sơ đã lưu';
+    $('assessment-scope').dataset.recordScope=item?`${item.period.slice(0,7)} · ${run?.title||'Hồ sơ đã lưu'} · v${item.version}${inProgressTag(item)}`:'Chưa có hồ sơ đã lưu';
     $('summary-points').textContent=String(data.points.length);
     $('summary-samples').textContent=String(data.rows.length);
     $('summary-outside').textContent=loading||error||!item?'—':String(outside);
     $('summary-unknown').textContent=loading||error||!item?'—':String(unknown);
     const text=!item?'Chưa có dữ liệu phù hợp. Chọn đợt, biểu mẫu và chỉ tiêu khi có hồ sơ đã lưu.':loading?'Đang tải giới hạn đã lưu cùng hồ sơ…':error?'Chưa tải được giới hạn đã lưu. Chọn “Tải lại giới hạn” để thử lại.':!annotated.length?'Chưa có kết quả cho phạm vi đã chọn.':outside?`${outside} kết quả ngoài giới hạn cho phép${unknown?`; ${unknown} kết quả chưa so sánh được với giới hạn; xem lý do trong bảng số liệu`:''}. Xem từng lần đo và nguồn hồ sơ bên dưới.`:unknown?`${annotated.length-unknown} kết quả trong giới hạn; ${unknown} kết quả chưa so sánh được với giới hạn; xem lý do trong bảng số liệu.`:'Tất cả kết quả trong phạm vi đang chọn đều nằm trong giới hạn cho phép đã lưu.';
-    $('trend-assessment').textContent=text;
-    $('trend-assessment-box').dataset.state=loading||error||!item?'pending':outside?'outside':unknown?'unknown':annotated.length?'within':'pending';
+    $('trend-assessment').textContent=inProgressNote(item)+text;
+    $('trend-assessment-box').dataset.state=loading||error||!item?'pending':outside?'outside':item.in_progress?'pending':unknown?'unknown':annotated.length?'within':'pending';
     $('assessment-scope').textContent=$('assessment-scope').dataset.recordScope;
   }
   function observationProps(point,title) {
@@ -307,7 +311,7 @@
   function renderTrend() {
     const system=$('trend-system').value;state.activeSystem=system;
     const entries=state.history.filter(h=>h.system===system).slice().sort((a,b)=>b.period.localeCompare(a.period)||String(a.record_id).localeCompare(String(b.record_id)));
-    selectOptions($('trend-record'),entries.map(h=>({value:snapshotKey(h),label:`${h.period.slice(0,7)} · ${state.runs.find(r=>r.id===h.run_id)?.title||'Hồ sơ '+String(h.record_id).slice(-8)} · v${h.version}`})),$('trend-record').value);
+    selectOptions($('trend-record'),entries.map(h=>({value:snapshotKey(h),label:`${h.period.slice(0,7)} · ${state.runs.find(r=>r.id===h.run_id)?.title||'Hồ sơ '+String(h.record_id).slice(-8)} · v${h.version}${inProgressTag(h)}`})),$('trend-record').value);
     const item=entries.find(h=>snapshotKey(h)===$('trend-record').value),rows=item?.trend||[],forms=[...new Set(rows.map(r=>r.form).filter(Boolean))];
     const skey=item&&snapshotKey(item),snapshot=state.snapshots.get(skey),error=state.snapshotErrors.get(skey),loading=!!item&&!snapshot&&!error;
     const formKeep=$('trend-form').options.length>1?$('trend-form').value:system==='nitrogen'?forms[0]:'';
@@ -358,7 +362,7 @@
     $('trend-show-all').onclick=()=>{state.hiddenPoints.clear();legend.querySelectorAll('input').forEach(input=>input.checked=true);draw();};$('trend-show-all').disabled=!points.length;
     draw();renderHistoryDetails(system);if(loading)fetchSnapshot(item);void loadLevels(system);
   }
-  function renderHistoryDetails(system) { const host = $('history-details'); host.replaceChildren(); const entries = state.history.filter(h => h.system === system); if (!entries.length) { host.append(el('p',{className:'empty',text:'Chưa có lịch sử nguồn cho hệ thống này.'})); return; } entries.forEach(item => { const box = el('article',{className:'history-item'}); box.append(el('strong',{text:`${item.period?.slice(0,7)} · hồ sơ ${item.record_id || '—'}`})); if ((item.issues || []).length) { const list = el('ul'); item.issues.forEach(issue => list.append(el('li',{text:typeof issue === 'string' ? issue : JSON.stringify(issue)}))); box.append(el('p',{className:'help',text:'Vấn đề cần xem xét:'}),list); } if ((item.sources || []).length) { const actions = el('div',{className:'source-actions'}); item.sources.forEach(source => actions.append(el('button',{type:'button',text:`Tải PDF: ${source.title || source.source_id}`,onclick:()=>download(source)}))); box.append(actions); } host.append(box); }); }
+  function renderHistoryDetails(system) { const host = $('history-details'); host.replaceChildren(); const entries = state.history.filter(h => h.system === system); if (!entries.length) { host.append(el('p',{className:'empty',text:'Chưa có lịch sử nguồn cho hệ thống này.'})); return; } entries.forEach(item => { const box = el('article',{className:'history-item'}); box.append(el('strong',{text:`${item.period?.slice(0,7)} · hồ sơ ${item.record_id || '—'}${inProgressTag(item)}`})); if ((item.issues || []).length) { const list = el('ul'); item.issues.forEach(issue => list.append(el('li',{text:typeof issue === 'string' ? issue : JSON.stringify(issue)}))); box.append(el('p',{className:'help',text:'Vấn đề cần xem xét:'}),list); } if ((item.sources || []).length) { const actions = el('div',{className:'source-actions'}); item.sources.forEach(source => actions.append(el('button',{type:'button',text:`Tải PDF: ${source.title || source.source_id}`,onclick:()=>download(source)}))); box.append(actions); } host.append(box); }); }
   async function download(source) { try { const blob = await window.CPC1Backend.downloadHistorySource(source.object_path); const url = URL.createObjectURL(blob), a = el('a',{href:url,download:source.title || 'nguon-lich-su.pdf'}); document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url); } catch(error) { message(errorText(error)); } }
   async function load() { const token=++state.loadToken;state.accessRevision++;state.snapshots.clear();state.levels.clear();state.levelErrors.clear();state.snapshotErrors.clear();state.pendingSnapshots.clear();state.configs={};state.runs=[];state.history=[];renderRuns();renderTrend();try { const backend = window.CPC1Backend; const session = await backend.getSession(); if (!session)throw new Error('Đăng nhập VMP để xem dữ liệu.'); const visible=availableSystems(backend), archiveVisible=Object.keys(systems).filter(system=>backend.permissionsFor(system).can_view&&(!route.dedicated||system===route.system)), entering=availableSystems(backend,true); const configs={}; for (const system of visible) configs[system]=system==='steam'?await backend.getConfig():await backend.getGasConfig(system); const [runs,history]=await Promise.all([backend.listRuns(),backend.listHistory()]); if(token!==state.loadToken)return; $('create-run').hidden=!entering.length;state.configs=configs; state.runs=runs || []; state.history=history || []; state.activeSystem=route.dedicated&&archiveVisible.includes(route.system)?route.system:archiveVisible[0]||''; renderCampaignSystems(); selectOptions($('single-system'), entering.map(value=>({value,label:systems[value]}))); selectOptions($('trend-system'), archiveVisible.map(value=>({value,label:systems[value]})),state.activeSystem); renderRuns(); renderTrend();toggleMode();message('Đã tải dữ liệu đợt và xu hướng.'); } catch(error) { if(token!==state.loadToken)return;message(errorText(error)); $('run-list').replaceChildren(el('p',{className:'empty',text:'Không tải được danh sách đợt. Dữ liệu đang nhập vẫn được giữ.'})); } }
   // ---- Tab Tổng quan ----

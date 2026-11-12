@@ -26,7 +26,7 @@ const rows=(system,early=false)=>{
  return out;
 };
 const runs=systems.flatMap(system=>[1,2,3].map(i=>({id:system+'-run-'+i,title:'Đợt '+i,status:i===3?'open':'closed',items:[],progress:{},mode:'single',started_on:'2026-03-01',version:1})));
-const history=systems.flatMap(system=>[1,2,3].map(i=>({run_id:system+'-run-'+i,record_id:system+'-record-'+i,version:1,system,period:i===1?'2026-03-01':i===2?'2026-05-01':'2026-02-01',trend:rows(system,i===1),sources:[],issues:[]})));
+const history=systems.flatMap(system=>[1,2,3].map(i=>({run_id:system+'-run-'+i,record_id:system+'-record-'+i,version:1,system,period:i===1?'2026-03-01':i===2?'2026-05-01':'2026-02-01',trend:rows(system,i===1),sources:[],issues:[],in_progress:i===3})));
 const snapshots=Object.fromEntries(history.map(item=>{
  const steam=item.system==='steam',main=steam?'bm03':'bm02',forms={},raw={};
  for(const form of [...new Set(item.trend.map(r=>r.form))]){const measured={};raw[form]={};for(const p of locations){const pointRows=item.trend.filter(r=>r.form===form&&r.point_id===p.id);if(form===main)measured[p.id]=pointRows.map(r=>({status:r.uncertain||r.value===null?'invalid':'pass',values:{raw_result:String(r.value)}}));else{measured[p.id]={status:'pass',parameters:Object.fromEntries(pointRows.map(r=>[r.metric,'pass']))};raw[form][p.id]=Object.fromEntries(pointRows.map(r=>[r.metric,String(r.value)]));}}forms[form]={rows:measured};}
@@ -88,6 +88,20 @@ try{
   await page.locator('#trend-record').selectOption(system+'-record-1:1');
   await page.waitForFunction(()=>document.querySelector('#limit-source').textContent.includes('fixture-1'));
   assert.match(await page.locator('#assessment-scope').textContent(),/2026-03.*Đợt 1.*v1/);
+  assert.doesNotMatch(await page.locator('#assessment-scope').textContent(),/Đang nhập/,'closed run is not labelled in progress');
+  assert.doesNotMatch(await page.locator('#trend-assessment').textContent(),/chưa chốt/);
+  // 12/11: đợt đang nhập xem được ở biểu đồ từng đợt, có nhãn và ghi rõ số liệu chưa chốt.
+  assert.match(await page.locator('#trend-record option[value="'+system+'-record-3:1"]').textContent(),/Đợt 3.*v1 · Đang nhập$/);
+  assert.equal(await page.locator('#trend-record option',{hasText:'Đang nhập'}).count(),1,'only the open run is labelled in progress');
+  await page.locator('#trend-record').selectOption(system+'-record-3:1');
+  await page.waitForFunction(()=>document.querySelector('#assessment-scope').textContent.includes('Đang nhập'));
+  await page.waitForFunction(()=>document.querySelector('#limit-source').textContent.includes('fixture-1'));
+  assert.match(await page.locator('#trend-assessment').textContent(),/^Đợt đang nhập, số liệu chưa chốt\. /);
+  assert.notEqual(await page.locator('#trend-assessment-box').getAttribute('data-state'),'within','partial data is never shown as within limits');
+  assert.ok(await page.locator('[data-chart=individual] .individual-value').count()>0,'in-progress run draws its saved sample points');
+  if(evidence)await page.screenshot({path:evidence+'/'+system+'-dang-nhap.png',fullPage:true});
+  await page.locator('#trend-record').selectOption(system+'-record-1:1');
+  await page.waitForFunction(()=>!document.querySelector('#assessment-scope').textContent.includes('Đang nhập'));
   assert.equal(await page.locator('[data-chart=individual] .individual-value').count(),17,'record switch stays in the selected run');
   assert.match(await page.locator('[data-chart=individual] .individual-value').first().getAttribute('aria-label'),system==='steam'?/0\.931/:/-22\.01/);
   await page.locator('#trend-record').selectOption(system+'-record-2:1');

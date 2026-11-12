@@ -213,3 +213,31 @@ test('C3 (10/11): mỗi số liệu xu hướng mang ngày đo; thiếu ngày đ
   const out = ui.trendSeries(closed, 'air', 'bm01', null, 'p05', 'hạt/m³');
   assert.deepEqual(plain(out.series.map(s => [s.point_id, s.values, s.dates])), [['A', [10], ['2026-10-21']], ['B', [20], ['2026-10-05']]]);
 });
+
+// 12/11/2026: xem xu hướng của đợt đang nhập (cpc1_history_list trả in_progress).
+test('in-progress records are labelled and flagged as not final; closed records are untouched', () => {
+  assert.equal(typeof ui.inProgressTag, 'function');
+  assert.equal(typeof ui.inProgressNote, 'function');
+  assert.equal(ui.inProgressTag({ in_progress: true }), ' · Đang nhập');
+  assert.equal(ui.inProgressNote({ in_progress: true }), 'Đợt đang nhập, số liệu chưa chốt. ');
+  for (const item of [{ in_progress: false }, {}, null, undefined]) {
+    assert.equal(ui.inProgressTag(item), '');
+    assert.equal(ui.inProgressNote(item), '');
+  }
+});
+
+test('the per-run chart offers in-progress records while the closed-runs chart still excludes them', () => {
+  assert.match(source, /label:`\$\{h\.period\.slice\(0,7\)\}[^`]*\$\{inProgressTag\(h\)\}`/);
+  assert.match(source, /\$\('trend-assessment'\)\.textContent=inProgressNote\(item\)\+text/);
+  // Đợt đang nhập không được tô xanh "trong giới hạn" khi số liệu còn thiếu; vượt giới hạn vẫn báo đỏ.
+  assert.match(source, /outside\?'outside':item\.in_progress\?'pending':unknown\?'unknown'/);
+  const runs = [{ id: 'r1', status: 'closed', started_on: '2026-03-01' }, { id: 'r2', status: 'open', started_on: '2026-10-15' }];
+  const history = [
+    { run_id: 'r1', system: 'air', period: '2026-03-01', in_progress: false },
+    { run_id: 'r2', system: 'air', period: '2026-10-01', in_progress: true }
+  ];
+  assert.deepEqual(plain(ui.closedTrendHistory(history, runs, 'air')).map(h => h.run_id), ['r1']);
+  // Đợt vừa đóng ở danh sách đợt nhưng dòng lịch sử còn là bản đang nhập: vẫn không vào biểu đồ qua các đợt.
+  const justClosed = runs.map(run => ({ ...run, status: 'closed' }));
+  assert.deepEqual(plain(ui.closedTrendHistory(history, justClosed, 'air')).map(h => h.run_id), ['r1']);
+});
