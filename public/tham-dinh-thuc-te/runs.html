@@ -88,14 +88,14 @@
     </section>
     <dl class="manager-stats" aria-label="Tổng hợp theo bộ lọc">
       <div><dt>Điểm lấy mẫu</dt><dd data-manager-stat="points">—</dd></div>
-      <div><dt>Đã đủ số đo / tổng việc</dt><dd data-manager-stat="complete">—</dd></div>
-      <div><dt>Chưa đủ số đo</dt><dd data-manager-stat="missing">—</dd></div>
-      <div><dt>Việc không đạt</dt><dd data-manager-stat="fail">—</dd></div>
+      <div><dt>Đã đủ / Tổng phép đo</dt><dd data-manager-stat="complete">—</dd></div>
+      <div><dt>Phép đo chưa đủ</dt><dd data-manager-stat="missing">—</dd></div>
+      <div><dt>Phép đo không đạt</dt><dd data-manager-stat="fail">—</dd></div>
       <div><dt>Chưa đối chiếu được</dt><dd data-manager-stat="unknown">—</dd></div>
     </dl>
     <div class="manager-progress"><progress id="manager-progress" max="100" value="0" aria-label="Tỷ lệ đã đủ số đo"></progress><p id="manager-progress-text"></p></div>
     <h2>Tiến độ theo khu</h2><p class="help">Bấm vào khu để lọc bảng. Thẻ khu tổng hợp mọi trạng thái; giữ bộ lọc hệ thống và chỉ tiêu.</p><div id="manager-areas" class="manager-area-grid"></div>
-    <section class="panel manager-table-panel" aria-labelledby="manager-table-heading"><h2 id="manager-table-heading">Kết quả chi tiết</h2><p id="manager-count" role="status" aria-live="polite"></p><p class="help">Mỗi dòng là một điểm × chỉ tiêu. Người thực hiện và ngày là thông tin khai báo trong hồ sơ; thời gian lưu hiển thị theo giờ Việt Nam. Đối chiếu từng chỉ tiêu theo giới hạn PQ; chứng dương và điều kiện hồ sơ xem ở biểu mẫu nguồn. Số việc chưa đủ có thể đồng thời không đạt.</p>
+    <section class="panel manager-table-panel" aria-labelledby="manager-table-heading"><h2 id="manager-table-heading">Kết quả chi tiết</h2><p id="manager-count" role="status" aria-live="polite"></p><p class="help">Mỗi dòng hiển thị một kết quả chỉ tiêu. Hai cỡ tiểu phân tại cùng điểm được đếm chung một phép đo; đủ cả hai mới tính hoàn thành. Người thực hiện và ngày là thông tin khai báo trong hồ sơ; thời gian lưu hiển thị theo giờ Việt Nam. Đối chiếu từng chỉ tiêu theo giới hạn PQ; chứng dương và điều kiện hồ sơ xem ở biểu mẫu nguồn. Số việc chưa đủ có thể đồng thời không đạt.</p>
       <p id="manager-empty" class="empty" hidden></p>
       <div class="table-scroll" tabindex="0" role="region" aria-label="Bảng kết quả có thể cuộn ngang"><table id="manager-table"><caption>Kết quả đã lưu trong đợt được chọn</caption><thead><tr><th scope="col">Khu</th><th scope="col">Hệ thống</th><th scope="col">Điểm lấy mẫu</th><th scope="col">Chỉ tiêu</th><th scope="col">Kết quả / lần đo</th><th scope="col">Giới hạn</th><th scope="col">Đối chiếu giới hạn</th><th scope="col">Người thực hiện / ngày</th><th scope="col">Hồ sơ nguồn</th></tr></thead><tbody></tbody></table></div>
     </section>

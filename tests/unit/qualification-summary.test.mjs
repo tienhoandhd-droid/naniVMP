@@ -12,7 +12,7 @@ test('area derives unique saved room code, explicit area takes priority and ambi
 });
 test('missing scoped points stay in denominator, zero is saved, particle channels stay independent',()=>{
  const rows=api().buildRows(run,item,snapshot());assert.equal(rows.length,4);assert.equal(rows.find(r=>r.point==='P1'&&r.metric==='p05').state,'pass');assert.equal(rows.find(r=>r.point==='P1'&&r.metric==='p05').values[0],'0');assert.equal(rows.find(r=>r.point==='P1'&&r.metric==='p5').state,'fail');
- const s=api().summarize(rows);assert.deepEqual([s.total,s.complete,s.pass,s.fail,s.missing,s.points,s.percent],[4,2,1,1,2,2,50]);
+ const s=api().summarize(rows);assert.deepEqual([s.total,s.complete,s.pass,s.fail,s.missing,s.points,s.percent],[2,1,0,1,1,2,50]);
 });
 test('filters intersect and do not mutate snapshot; declared performer is not presented as updater',()=>{
  const before=snapshot(),raw=JSON.stringify(before),rows=api().buildRows(run,item,before),filtered=api().filterRows(rows,{system:'air',area:'C1',metric:'bm01:p5',state:'fail'});assert.equal(filtered.length,1);assert.equal(filtered[0].performer,'An');assert.equal(filtered[0].date,'2026-11-24');assert.equal(filtered[0].savedAt,before.created_at);assert.equal(JSON.stringify(before),raw);assert.equal(api().filterRows(rows,{system:'nitrogen'}).length,0);
@@ -94,4 +94,27 @@ test('legacy steam BM02 combined failure is not copied to its other parameters',
  s.evaluation.source_context={config:{locations:[{id:'P1',endotoxin:false}]},criteria:{conductivity_max:1.3,toc_max:500,microbial_max:10}};
  s.evaluation.forms={bm02:{rows:{P1:{status:'fail',values:{conductivity:'2',toc:'100',microbial:'0'}}}}};
  const rows=api().buildRows(run,{...item,system:'steam',scope:{bm02:['P1']}},s);assert.equal(rows.find(r=>r.metric==='conductivity').state,'fail');assert.equal(rows.find(r=>r.metric==='toc').state,'pass');assert.equal(rows.find(r=>r.metric==='microbial').state,'pass');
+});
+
+test('particle sizes are one measurement in progress while both indicator verdicts remain visible',()=>{
+ const rows=api().buildRows(run,item,snapshot());assert.equal(rows.length,4);
+ const s=api().summarize(rows);assert.deepEqual([s.total,s.complete,s.fail,s.missing,s.percent],[2,1,1,1,50]);
+});
+test('one particle size filter cannot manufacture completion when its sibling is missing',()=>{
+ const s=snapshot();s.evaluation.forms.bm01.rows.P1={status:'incomplete',parameters:{p05:'pass',p5:'incomplete'},values:{p05:'0'}};
+ const rows=api().buildRows(run,item,s),small=api().filterRows(rows,{area:'C1',metric:'bm01:p05'});
+ assert.equal(small[0].state,'pass');assert.equal(api().summarize(small).complete,0);assert.equal(api().filterRows(rows,{area:'C1',state:'missing'}).length,2);
+});
+test('both failed particle sizes count once, but separate runs and systems remain separate measurements',()=>{
+ const s=snapshot();s.evaluation.forms.bm01.rows.P1.parameters={p05:'fail',p5:'fail'};s.evaluation.forms.bm01.rows.P1.values.p05='120';s.data.forms.bm01.P1.p05='120';
+ const rows=api().buildRows(run,{...item,scope:{bm01:['P1']}},s);assert.equal(api().summarize(rows).fail,1);
+ const anotherRun=rows.map(r=>({...r,run:'another'})),anotherSystem=rows.map(r=>({...r,system:'nitrogen'})),anotherRecord=rows.map(r=>({...r,record:'another-record'}));assert.equal(api().summarize([...rows,...anotherRun,...anotherSystem,...anotherRecord]).total,4);
+});
+test('other indicators keep their individual counts',()=>{
+ const rows=[{run:'run',record:'s',system:'steam',form:'bm02',point:'P1',metric:'toc',state:'pass',complete:true},{run:'run',record:'s',system:'steam',form:'bm02',point:'P1',metric:'microbial',state:'pass',complete:true}];assert.equal(api().summarize(rows).total,2);
+});
+test('metric options are grouped in form order with plain labels and distinct steam/gas meanings',()=>{
+ assert.equal(typeof api().metricOptions,'function');
+ const rows=[{system:'steam',form:'bm03',metric:'result',metricKey:'bm03:result',label:'Độ khô'},{system:'air',form:'bm01',metric:'p5',metricKey:'bm01:p5',label:'Tiểu phân ≥ 5 µm'},{system:'air',form:'bm03',metric:'result',metricKey:'bm03:result',label:'Hàm lượng dầu'},{system:'nitrogen',form:'bm01',metric:'p5',metricKey:'bm01:p5',label:'Tiểu phân ≥ 5 µm'}];
+ const options=api().metricOptions(rows);assert.equal(options.length,3);assert.deepEqual(Array.from(options,o=>o.form),['bm01','bm03','bm03']);assert.ok(options.every(o=>!o.label.includes('BM')));assert.notEqual(options.find(o=>o.label==='Độ khô').value,options.find(o=>o.label==='Hàm lượng dầu').value);assert.deepEqual(Array.from(api().filterRows(rows,{metric:options.find(o=>o.label==='Độ khô').value}),r=>r.label),['Độ khô']);assert.deepEqual(Array.from(api().filterRows(rows,{metric:options.find(o=>o.label==='Hàm lượng dầu').value}),r=>r.label),['Hàm lượng dầu']);
 });

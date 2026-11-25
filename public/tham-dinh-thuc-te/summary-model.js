@@ -20,6 +20,10 @@
     const numeric=Number(text.replace(',','.'));
     return Number.isFinite(numeric)?numeric:null;
   }
+  const particle=row=>['air','nitrogen'].includes(row.system)&&row.form==='bm01'&&['p05','p5'].includes(row.metric);
+  const workKey=row=>JSON.stringify([row.run||'',row.record||'',row.system,row.form,row.point,particle(row)?'particles':row.metric]);
+  const completeFor=row=>row.measurementComplete??row.complete;
+  const metricKey=row=>(row.system==='steam'?'steam:':'')+(row.metricKey||row.form+':'+row.metric);
   function buildRows(run,item,snapshot) {
     const ev=snapshot?.evaluation,config=ev?.source_context?.config,data=snapshot?.data,isSteam=item.system==='steam',rows=[];
     const scope=item.scope||ev?.run_scope||{};
@@ -54,12 +58,29 @@
         rows.push({system:item.system,form,point,metric,label,unit,metricKey:form+':'+metric,area:areaFor(location),name:location?.name||'Chưa có tên điểm trong phiên bản đã lưu',state,complete,values:details.map(t=>t.value),limits:details.some(t=>t.qualitative)?['Định tính: Đạt']:[...new Set(details.filter(t=>t.action.limit!==null).map(t=>(t.action.direction==='min'?'≥ ':'≤ ')+t.action.limit))],sampledBy:!isSteam&&form==='bm04'?details[0].raw?.sampled_by||null:null,samplingDate:!isSteam&&form==='bm04'?details[0].raw?.sampling_date||null:null,performer:people.join(' · ')||'Chưa khai báo',date:dates.join(' · ')||'Chưa khai báo',savedAt:snapshot?.created_at||null,record:item.record_id,version:item.version,run:run.id,runStatus:run.status});
       }
     }
+    const particles=new Map();
+    for(const row of rows)if(particle(row)){const key=workKey(row);if(!particles.has(key))particles.set(key,[]);particles.get(key).push(row);}
+    for(const group of particles.values()){
+      const complete=new Set(group.map(row=>row.metric)).size===2&&group.every(row=>row.complete);
+      for(const row of group)row.measurementComplete=complete;
+    }
     return rows;
   }
-  function filterRows(rows,filters={}) {return rows.filter(row=>['system','area'].every(key=>!filters[key]||row[key]===filters[key])&&(!filters.state||(filters.state==='missing'?!row.complete:row.state===filters.state))&&(!filters.metric||row.metricKey===filters.metric));}
-  function summarize(rows) {
-    const total=rows.length,complete=rows.filter(r=>r.complete).length;
-    return {total,complete,percent:total?Math.round(complete*100/total):0,points:new Set(rows.map(r=>r.system+':'+r.point)).size,missing:total-complete,...Object.fromEntries(['pass','fail','unknown'].map(state=>[state,rows.filter(r=>r.state===state).length]))};
+  function filterRows(rows,filters={}) {return rows.filter(row=>['system','area'].every(key=>!filters[key]||row[key]===filters[key])&&(!filters.state||(filters.state==='missing'?!completeFor(row):row.state===filters.state))&&(!filters.metric||metricKey(row)===filters.metric));}
+  function metricOptions(rows) {
+    const options=new Map();
+    for(const row of rows)options.set(metricKey(row),{value:metricKey(row),label:row.label,form:row.form});
+    return [...options.values()].sort((a,b)=>a.form.localeCompare(b.form,'vi',{numeric:true})||a.label.localeCompare(b.label,'vi',{numeric:true}));
   }
-  window.CPC1SummaryModel=Object.freeze({areaFor,buildRows,filterRows,summarize});
+  function summarize(rows) {
+    const groups=new Map();
+    for(const row of rows){const key=workKey(row);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
+    const measurements=[...groups.values()].map(group=>{
+      const complete=group.every(row=>completeFor(row));
+      return {complete,pass:complete&&group.every(row=>row.state==='pass'),fail:group.some(row=>row.state==='fail'),unknown:group.some(row=>row.state==='unknown')};
+    });
+    const total=measurements.length,complete=measurements.filter(m=>m.complete).length;
+    return {total,complete,percent:total?Math.round(complete*100/total):0,points:new Set(rows.map(r=>r.system+':'+r.point)).size,missing:total-complete,...Object.fromEntries(['pass','fail','unknown'].map(state=>[state,measurements.filter(m=>m[state]).length]))};
+  }
+  window.CPC1SummaryModel=Object.freeze({areaFor,buildRows,filterRows,metricOptions,summarize});
 })();
