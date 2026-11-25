@@ -10,6 +10,16 @@
     const areas=[...new Set([...(roomId?[roomId[1].toUpperCase()]:[]),...Array.from(String(point?.name||'').toUpperCase().matchAll(/\b([A-Z]\d+)\.[A-Z]\d+\b/g),m=>m[1])])];
     return areas.length===1?areas[0]:unknownArea;
   }
+  // SQL shown(numeric) returns text. Parse only the numeric representation;
+  // keep the saved text and the existing exact-decimal comparison unchanged.
+  function savedNumber(value) {
+    if(typeof value==='number')return Number.isFinite(value)?value:null;
+    if(typeof value!=='string')return null;
+    const text=value.trim();
+    if(text.length>100||!/^[-+]?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(text))return null;
+    const numeric=Number(text.replace(',','.'));
+    return Number.isFinite(numeric)?numeric:null;
+  }
   function buildRows(run,item,snapshot) {
     const ev=snapshot?.evaluation,config=ev?.source_context?.config,data=snapshot?.data,isSteam=item.system==='steam',rows=[];
     const scope=item.scope||ev?.run_scope||{};
@@ -21,18 +31,27 @@
         if(isSteam&&metric==='endotoxin'&&location?.endotoxin===false)continue;
         const details=trials.map((result,index)=>{
           const raw=isSteam?(form==='bm02'?data?.[form]?.[point]:data?.[form]?.[point]?.[index]):data?.forms?.[form]?.[point];
-          const value=result?.values?.[metric],status=result?.parameters?.[metric]||result?.status;
-          const trendRow={form,point_id:point,metric,label,unit,trial:index+1,value:typeof value==='number'&&Number.isFinite(value)?value:null};
+          const value=result?.values?.[metric],parameterStatus=result?.parameters?.[metric],status=parameterStatus||result?.status;
+          const trendRow={form,point_id:point,metric,label,unit,trial:index+1,value:savedNumber(value)};
           const action=window.CPC1TrendLimits.annotate(item.system,trendRow,snapshot);
-          return {status,action,raw,value:action.rawValue??(value===null||value===undefined?'—':String(value)),numeric:trendRow.value!==null};
+          const savedLimit=window.CPC1TrendLimits.limitFor?.(item.system,form,metric,unit,point,snapshot);
+          if(action.limit===null&&savedLimit){action.limit=savedLimit.limit;action.direction=savedLimit.direction;}
+          const qualitative=isSteam&&metric==='endotoxin'&&((String(value).trim()==='Đạt'&&status==='pass')||(String(value).trim()==='Không đạt'&&status==='fail'));
+          // Prefer the evaluator's saved verdict when it identifies this indicator.
+          // A combined failure cannot determine which particle/steam subcriterion failed.
+          const numeric=trendRow.value!==null,composite=((isSteam?steam:gas)[form]||[]).length>1;
+          const savedVerdict=(numeric||qualitative)&&['pass','fail'].includes(status)&&(parameterStatus||!composite||status==='pass')?status:null;
+          const verdict=savedVerdict||(action.state==='within'?'pass':['above','below'].includes(action.state)?'fail':null);
+          const sourceWord=isSteam&&form==='bm02'&&metric==='microbial'&&/^(KPH|KFH)$/i.test(String(raw?.microbial).trim())?String(raw.microbial):null;
+          return {status,action,raw,qualitative,verdict,value:sourceWord??action.rawValue??(value===null||value===undefined?'—':String(value)),numeric};
         });
-        const complete=!!snapshot&&details.every(t=>['pass','fail'].includes(t.status)&&t.numeric);
-        const hasFail=details.some(t=>['above','below'].includes(t.action.state));
+        const complete=!!snapshot&&details.every(t=>['pass','fail'].includes(t.status)&&(t.numeric||t.qualitative));
+        const hasFail=details.some(t=>t.verdict==='fail');
         const missing=details.some(t=>!t.status||t.status==='incomplete');
-        const state=hasFail?'fail':!snapshot?'unknown':missing?'missing':details.every(t=>t.action.state==='within')?'pass':'unknown';
+        const state=hasFail?'fail':!snapshot?'unknown':missing?'missing':details.every(t=>t.verdict==='pass')?'pass':'unknown';
         const people=[...new Set(details.map(t=>isSteam?t.raw?.executor:t.raw?.executed_by).filter(Boolean))];
         const dates=[...new Set(details.map(t=>isSteam?t.raw?.date:form==='bm04'?t.raw?.result_date:t.raw?.execution_date).filter(Boolean))];
-        rows.push({system:item.system,form,point,metric,label,unit,metricKey:form+':'+metric,area:areaFor(location),name:location?.name||'Chưa có tên điểm trong phiên bản đã lưu',state,complete,values:details.map(t=>t.value),limits:[...new Set(details.filter(t=>t.action.limit!==null).map(t=>(t.action.direction==='min'?'≥ ':'≤ ')+t.action.limit))],sampledBy:!isSteam&&form==='bm04'?details[0].raw?.sampled_by||null:null,samplingDate:!isSteam&&form==='bm04'?details[0].raw?.sampling_date||null:null,performer:people.join(' · ')||'Chưa khai báo',date:dates.join(' · ')||'Chưa khai báo',savedAt:snapshot?.created_at||null,record:item.record_id,version:item.version,run:run.id,runStatus:run.status});
+        rows.push({system:item.system,form,point,metric,label,unit,metricKey:form+':'+metric,area:areaFor(location),name:location?.name||'Chưa có tên điểm trong phiên bản đã lưu',state,complete,values:details.map(t=>t.value),limits:details.some(t=>t.qualitative)?['Định tính: Đạt']:[...new Set(details.filter(t=>t.action.limit!==null).map(t=>(t.action.direction==='min'?'≥ ':'≤ ')+t.action.limit))],sampledBy:!isSteam&&form==='bm04'?details[0].raw?.sampled_by||null:null,samplingDate:!isSteam&&form==='bm04'?details[0].raw?.sampling_date||null:null,performer:people.join(' · ')||'Chưa khai báo',date:dates.join(' · ')||'Chưa khai báo',savedAt:snapshot?.created_at||null,record:item.record_id,version:item.version,run:run.id,runStatus:run.status});
       }
     }
     return rows;
