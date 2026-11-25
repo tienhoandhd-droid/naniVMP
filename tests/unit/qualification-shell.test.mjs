@@ -25,7 +25,7 @@ test('reject external, traversal, unknown files, duplicate or unsupported parame
 
 test('navigation filters systems fail-closed, keeps archive-only access, and has no library destination',()=>{
  const groups=qualificationNavigationForSystems(['steam','nitrogen']);
- assert.deepEqual(groups.map((group)=>group.label),['Đợt thẩm định','Nhật ký thay đổi','Hơi tinh khiết','Khí nitơ']);
+ assert.deepEqual(groups.map((group)=>group.label),['Đợt thẩm định','Tổng hợp kết quả','Nhật ký thay đổi','Hơi tinh khiết','Khí nitơ']);
  assert.equal(groups.some((group)=>group.target==='index.html'),false);
  assert.ok(groups.find((group)=>group.system==='steam')?.links.some((link)=>link.label==='BM03 — Độ khô'));
  assert.ok(groups.find((group)=>group.system==='nitrogen')?.links.some((link)=>link.label==='Sơ đồ xu hướng khí nitơ'));
@@ -80,4 +80,17 @@ test('a form run binding must include both run and record identifiers',()=>{
  const id='11111111-1111-4111-8111-111111111111';
  for(const target of [`steam.html?run=${id}`,`gas.html?system=air&record=${id}`])assert.equal(qualificationTarget(target,base),null);
  const target=`gas.html?system=air&run=${id}&record=${id}`;assert.equal(qualificationTarget(target,base),target);
+});
+
+test('manager summary is a known read-only route, visible alongside runs and strict about extra parameters',()=>{
+ assert.equal(qualificationTarget('runs.html?view=summary',base),'runs.html?view=summary');
+ assert.equal(qualificationTarget('runs.html?view=summary&system=air',base),null);
+ assert.equal(qualificationTarget('runs.html?view=summary&view=trend',base),null);
+ assert.ok(qualificationNavigationForSystems(['air']).some(g=>g.target==='runs.html?view=summary'));
+});
+
+test('summary route rejects irrelevant record binding while source form bindings remain valid',()=>{
+ const id='11111111-1111-4111-8111-111111111111';
+ assert.equal(qualificationTarget(`runs.html?view=summary&run=${id}&record=${id}`,base),null);
+ assert.equal(qualificationTarget(`steam.html?run=${id}&record=${id}`,base),`steam.html?run=${id}&record=${id}`);
 });

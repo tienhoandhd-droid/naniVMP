@@ -5,7 +5,7 @@
   <script src="./appearance.js"></script><link rel="stylesheet" href="./vmp-tokens.css">
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Đợt thực hiện và xu hướng | VMP</title>
-  <link rel="stylesheet" href="./vmp-theme.css"><link rel="stylesheet" href="./rail.css"><link rel="stylesheet" href="./runs.css"><link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./vmp-theme.css"><link rel="stylesheet" href="./rail.css"><link rel="stylesheet" href="./runs.css"><link rel="stylesheet" href="./summary.css"><link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="./vmp-embed.css">
 </head>
 <body data-qualification-gate="pending">
@@ -15,7 +15,7 @@
 <main id="main-content" class="runs-shell" tabindex="-1">
   <p class="eyebrow">THẨM ĐỊNH THỰC TẾ</p><h1>Đợt thực hiện và biểu đồ lấy mẫu</h1><p class="intro">Tạo phạm vi lấy mẫu, theo dõi hồ sơ trong đợt và xem số đã lưu theo từng điểm. Kết quả không thay thế quyết định phê duyệt QA.</p>
   <p id="runs-status" class="status-line" role="status" aria-live="polite">Đang tải dữ liệu…</p>
-  <div class="page-tabs" role="tablist" aria-label="Nội dung"><button id="runs-tab" type="button" role="tab" aria-selected="true" aria-controls="runs-panel">Đợt thực hiện</button><button id="trend-tab" type="button" role="tab" aria-selected="false" aria-controls="trend-panel">Biểu đồ lấy mẫu</button><button id="overview-tab" type="button" role="tab" aria-selected="false" aria-controls="overview-panel">Tổng quan</button></div>
+  <div class="page-tabs" role="tablist" aria-label="Nội dung"><button id="runs-tab" type="button" role="tab" aria-selected="true" aria-controls="runs-panel">Đợt thực hiện</button><button id="trend-tab" type="button" role="tab" aria-selected="false" aria-controls="trend-panel">Biểu đồ lấy mẫu</button><button id="overview-tab" type="button" role="tab" aria-selected="false" aria-controls="overview-panel">Tổng quan</button><button id="summary-tab" type="button" role="tab" aria-selected="false" aria-controls="summary-panel">Tổng hợp kết quả</button></div>
   <section id="runs-panel" role="tabpanel" aria-labelledby="runs-tab"><div class="runs-grid"><section class="panel create-panel" aria-labelledby="create-title"><h2 id="create-title">Tạo đợt thực hiện</h2><form id="create-run" novalidate><label>Tên đợt<input id="run-title" name="title" required maxlength="200" placeholder="Ví dụ: Đợt lấy mẫu tháng 10"></label><label>Ngày bắt đầu<input id="run-started" name="started_on" type="date" required></label><fieldset><legend>Phạm vi lấy mẫu</legend><label class="choice"><input type="radio" name="mode" value="campaign" checked> Đợt đầy đủ theo hệ thống đã chọn</label><label class="choice"><input type="radio" name="mode" value="single"> Một hệ thống, biểu mẫu và điểm chọn riêng</label></fieldset><div id="campaign-systems" class="scope-options" aria-label="Hệ thống cho đợt đầy đủ"></div><label id="single-system-wrap" hidden>Hệ thống<select id="single-system"></select></label><div id="scope-picker" hidden></div><p id="scope-help" class="help">Đợt đầy đủ gồm toàn bộ biểu mẫu đo và điểm của từng hệ thống được chọn.</p><section class="calibration-requirements" aria-labelledby="calibration-title"><h3 id="calibration-title">Thiết bị và hạn áp dụng</h3><p id="calibration-status" class="help" role="status" aria-live="polite">Chọn phạm vi để tải yêu cầu thiết bị.</p><div id="calibration-fields"></div></section><p id="create-error" class="form-error" role="alert" hidden></p><button id="create-submit" class="primary" type="submit">Tạo đợt</button></form></section><section class="panel" aria-labelledby="active-title"><div class="panel-heading"><h2 id="active-title">Các đợt đã tạo</h2><button id="reload-runs" type="button">Tải lại</button></div><div id="run-list" class="run-list" aria-live="polite"></div></section></div></section>
   <section id="trend-panel" role="tabpanel" aria-labelledby="trend-tab" hidden>
     <section class="panel trend-filter-card" aria-labelledby="trend-filter-heading">
@@ -74,6 +74,32 @@
     <div class="panel-heading"><h2 id="overview-title">Tổng quan thẩm định thực tế</h2><button id="reload-overview" type="button">Tải lại</button></div>
     <div id="overview-body" aria-live="polite"></div>
   </section>
+  <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab" hidden>
+    <section class="panel" aria-labelledby="manager-heading">
+      <div class="manager-heading"><div><p class="eyebrow">THEO DÕI THỰC HIỆN</p><h2 id="manager-heading">Tổng hợp kết quả khí &amp; hơi</h2><p>Theo dõi số đo đã lưu theo khu, điểm lấy mẫu và chỉ tiêu.</p></div><div class="manager-actions"><button id="manager-reset" type="button">Xóa bộ lọc</button><button id="manager-reload" type="button">Tải lại dữ liệu</button></div></div>
+      <div class="manager-filters">
+        <label>Đợt thực hiện<select id="manager-run"></select></label>
+        <label>Hệ thống<select id="manager-system"><option value="">Tất cả hệ thống</option></select></label>
+        <label>Khu vực<select id="manager-area"><option value="">Tất cả khu</option></select></label>
+        <label>Chỉ tiêu<select id="manager-metric"><option value="">Tất cả chỉ tiêu</option></select></label>
+        <label>Kết quả<select id="manager-state"><option value="">Tất cả kết quả</option><option value="missing">Chưa đủ số đo</option><option value="fail">Không đạt</option><option value="unknown">Chưa đối chiếu được</option><option value="pass">Đạt</option></select></label>
+      </div>
+      <p id="manager-context" class="help"></p><p id="manager-status" role="status" aria-live="polite">Đang tải danh sách đợt…</p><button id="manager-retry" type="button" hidden>Thử tải lại hồ sơ</button>
+    </section>
+    <dl class="manager-stats" aria-label="Tổng hợp theo bộ lọc">
+      <div><dt>Điểm lấy mẫu</dt><dd data-manager-stat="points">—</dd></div>
+      <div><dt>Đã đủ số đo / tổng việc</dt><dd data-manager-stat="complete">—</dd></div>
+      <div><dt>Chưa đủ số đo</dt><dd data-manager-stat="missing">—</dd></div>
+      <div><dt>Việc không đạt</dt><dd data-manager-stat="fail">—</dd></div>
+      <div><dt>Chưa đối chiếu được</dt><dd data-manager-stat="unknown">—</dd></div>
+    </dl>
+    <div class="manager-progress"><progress id="manager-progress" max="100" value="0" aria-label="Tỷ lệ đã đủ số đo"></progress><p id="manager-progress-text"></p></div>
+    <h2>Tiến độ theo khu</h2><p class="help">Bấm vào khu để lọc bảng. Thẻ khu tổng hợp mọi trạng thái; giữ bộ lọc hệ thống và chỉ tiêu.</p><div id="manager-areas" class="manager-area-grid"></div>
+    <section class="panel manager-table-panel" aria-labelledby="manager-table-heading"><h2 id="manager-table-heading">Kết quả chi tiết</h2><p id="manager-count" role="status" aria-live="polite"></p><p class="help">Mỗi dòng là một điểm × chỉ tiêu. Người thực hiện và ngày là thông tin khai báo trong hồ sơ; thời gian lưu hiển thị theo giờ Việt Nam. Đối chiếu từng chỉ tiêu theo giới hạn PQ; chứng dương và điều kiện hồ sơ xem ở biểu mẫu nguồn. Số việc chưa đủ có thể đồng thời không đạt.</p>
+      <p id="manager-empty" class="empty" hidden></p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Bảng kết quả có thể cuộn ngang"><table id="manager-table"><caption>Kết quả đã lưu trong đợt được chọn</caption><thead><tr><th scope="col">Khu</th><th scope="col">Hệ thống</th><th scope="col">Điểm lấy mẫu</th><th scope="col">Chỉ tiêu</th><th scope="col">Kết quả / lần đo</th><th scope="col">Giới hạn</th><th scope="col">Đối chiếu giới hạn</th><th scope="col">Người thực hiện / ngày</th><th scope="col">Hồ sơ nguồn</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </section>
 </main></div>
-<script src="./runtime-config.js" defer></script><script src="./cloud.js" defer></script><script src="./point-labels.js" defer></script><script src="./trend-limits.js" defer></script><script src="./box-stats.js" defer></script><script src="./pq-charts.js" defer></script><script src="./runs.js" defer></script>
+<script src="./runtime-config.js" defer></script><script src="./cloud.js" defer></script><script src="./point-labels.js" defer></script><script src="./trend-limits.js" defer></script><script src="./box-stats.js" defer></script><script src="./pq-charts.js" defer></script><script src="./summary-model.js" defer></script><script src="./summary.js" defer></script><script src="./runs.js" defer></script>
 </body></html>

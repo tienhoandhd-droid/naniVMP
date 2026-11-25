@@ -124,11 +124,13 @@ try {
   assert.equal(await page.evaluate(() => window.__calls.length), 1);
   await page.locator('#reload-overview').click();
   await page.waitForFunction(() => window.__calls.length === 2);
-  // Bàn phím: ← từ Tổng quan về Biểu đồ, End về Tổng quan.
+  // Bàn phím: ← về Biểu đồ, End tới Tổng hợp mới; ← quay lại Tổng quan.
   await page.getByRole('tab', { name: 'Tổng quan' }).focus();
   await page.keyboard.press('ArrowLeft');
   assert.equal(await page.getByRole('tab', { name: 'Biểu đồ lấy mẫu' }).getAttribute('aria-selected'), 'true');
   await page.keyboard.press('End');
+  assert.equal(await page.getByRole('tab', { name: 'Tổng hợp kết quả' }).getAttribute('aria-selected'), 'true');
+  await page.keyboard.press('ArrowLeft');
   assert.equal(await page.getByRole('tab', { name: 'Tổng quan' }).getAttribute('aria-selected'), 'true');
   // Không cuộn ngang ở các bề rộng thường gặp.
   await page.locator('[data-overview-system="air"]').waitFor();

@@ -1,6 +1,7 @@
 /** The shell accepts module destinations only; never an arbitrary frame URL. */
 export const QUALIFICATION_LINKS = [
   {label:'Đợt thẩm định',target:'runs.html'},
+  {label:'Tổng hợp kết quả',target:'runs.html?view=summary'},
 ];
 export function qualificationTarget(input: string, base: string): string | null {
   if (!input || /[\\\\\s]/.test(input) || /(?:%2e|%2f|%5c|\.\.)/i.test(input)) return null;
@@ -15,11 +16,12 @@ export function qualificationTarget(input: string, base: string): string | null 
     for(const [key,value] of url.searchParams) {
       if(url.searchParams.getAll(key).length!==1)return null;
       if(key==='system' ? !((file==='gas.html'&&['air','nitrogen'].includes(value)) || (file==='runs.html'&&url.searchParams.get('view')==='trend'&&['steam','air','nitrogen'].includes(value)))
-        : key==='view' ? !((value==='records'&&['steam.html','gas.html'].includes(file)) || (value==='trend'&&file==='runs.html'))
+        : key==='view' ? !((value==='records'&&['steam.html','gas.html'].includes(file)) || (['trend','summary'].includes(value)&&file==='runs.html'))
         : key==='form' ? !/^[A-Za-z0-9_-]{1,40}$/.test(value) || !['steam.html','gas.html'].includes(file)
         : ['run','record'].includes(key) ? !/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(value)
         : true)return null;
     }
+    if(file==='runs.html'&&url.searchParams.get('view')==='summary'&&(url.searchParams.has('run')||url.searchParams.has('record')))return null;
     if(file==='runs.html'&&url.searchParams.get('view')==='trend'&&!['steam','air','nitrogen'].includes(url.searchParams.get('system')||''))return null;
     if(file==='runs.html'&&url.searchParams.has('system')&&url.searchParams.get('view')!=='trend')return null;
     if(['steam.html','gas.html'].includes(file)&&url.searchParams.has('run')!==url.searchParams.has('record'))return null;

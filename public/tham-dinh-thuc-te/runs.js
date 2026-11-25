@@ -143,6 +143,7 @@
   const $ = id => document.getElementById(id);
   const el = (name, props = {}, children = []) => { const node = ['text','line','path','circle','rect','title','g'].includes(name)?document.createElementNS('http://www.w3.org/2000/svg',name):document.createElement(name); Object.entries(props).forEach(([key, value]) => { if (key === 'text') node.textContent = value; else if (key === 'className') node.setAttribute('class',value); else if (key.startsWith('on')) node.addEventListener(key.slice(2), value); else node.setAttribute(key, value); }); node.append(...children); return node; };
   const state = { configs: {}, runs: [], history: [], requirements: [], requirementToken: 0, activeSystem: 'steam', trendKey: '', hiddenPoints: new Set(), snapshots: new Map(), snapshotErrors: new Map(), pendingSnapshots: new Map(), accessRevision:0, loadToken:0, levels:new Map(), levelErrors:new Map(), levelsLoading:new Set() };
+  const summary=window.CPC1Summary.mount($('summary-panel'),{loadSnapshot:(id,version)=>window.CPC1Backend.historySnapshot(id,version),onReload:()=>void load()});
   const message = text => { $('runs-status').textContent = text; };
   const errorText = error => error?.message || 'Không thể tải dữ liệu. Thử lại sau.';
   const payloadKey = payload => JSON.stringify(payload);
@@ -364,7 +365,35 @@
   }
   function renderHistoryDetails(system) { const host = $('history-details'); host.replaceChildren(); const entries = state.history.filter(h => h.system === system); if (!entries.length) { host.append(el('p',{className:'empty',text:'Chưa có lịch sử nguồn cho hệ thống này.'})); return; } entries.forEach(item => { const box = el('article',{className:'history-item'}); box.append(el('strong',{text:`${item.period?.slice(0,7)} · hồ sơ ${item.record_id || '—'}${inProgressTag(item)}`})); if ((item.issues || []).length) { const list = el('ul'); item.issues.forEach(issue => list.append(el('li',{text:typeof issue === 'string' ? issue : JSON.stringify(issue)}))); box.append(el('p',{className:'help',text:'Vấn đề cần xem xét:'}),list); } if ((item.sources || []).length) { const actions = el('div',{className:'source-actions'}); item.sources.forEach(source => actions.append(el('button',{type:'button',text:`Tải PDF: ${source.title || source.source_id}`,onclick:()=>download(source)}))); box.append(actions); } host.append(box); }); }
   async function download(source) { try { const blob = await window.CPC1Backend.downloadHistorySource(source.object_path); const url = URL.createObjectURL(blob), a = el('a',{href:url,download:source.title || 'nguon-lich-su.pdf'}); document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url); } catch(error) { message(errorText(error)); } }
-  async function load() { const token=++state.loadToken;state.accessRevision++;state.snapshots.clear();state.levels.clear();state.levelErrors.clear();state.snapshotErrors.clear();state.pendingSnapshots.clear();state.configs={};state.runs=[];state.history=[];renderRuns();renderTrend();try { const backend = window.CPC1Backend; const session = await backend.getSession(); if (!session)throw new Error('Đăng nhập VMP để xem dữ liệu.'); const visible=availableSystems(backend), archiveVisible=Object.keys(systems).filter(system=>backend.permissionsFor(system).can_view&&(!route.dedicated||system===route.system)), entering=availableSystems(backend,true); const configs={}; for (const system of visible) configs[system]=system==='steam'?await backend.getConfig():await backend.getGasConfig(system); const [runs,history]=await Promise.all([backend.listRuns(),backend.listHistory()]); if(token!==state.loadToken)return; $('create-run').hidden=!entering.length;state.configs=configs; state.runs=runs || []; state.history=history || []; state.activeSystem=route.dedicated&&archiveVisible.includes(route.system)?route.system:archiveVisible[0]||''; renderCampaignSystems(); selectOptions($('single-system'), entering.map(value=>({value,label:systems[value]}))); selectOptions($('trend-system'), archiveVisible.map(value=>({value,label:systems[value]})),state.activeSystem); renderRuns(); renderTrend();toggleMode();message('Đã tải dữ liệu đợt và xu hướng.'); } catch(error) { if(token!==state.loadToken)return;message(errorText(error)); $('run-list').replaceChildren(el('p',{className:'empty',text:'Không tải được danh sách đợt. Dữ liệu đang nhập vẫn được giữ.'})); } }
+  async function load() {
+    summary.clear();
+    const token=++state.loadToken;let summaryReady=false;
+    state.accessRevision++;state.snapshots.clear();state.levels.clear();state.levelErrors.clear();state.snapshotErrors.clear();state.pendingSnapshots.clear();state.configs={};state.runs=[];state.history=[];
+    renderRuns();renderTrend();
+    try {
+      const backend=window.CPC1Backend,session=await backend.getSession();
+      if(!session)throw new Error('Đăng nhập VMP để xem dữ liệu.');
+      const visible=availableSystems(backend),archiveVisible=Object.keys(systems).filter(system=>backend.permissionsFor(system).can_view&&(!route.dedicated||system===route.system)),entering=availableSystems(backend,true);
+      // Saved results depend only on authorized run items and their pinned revisions.
+      // Current creation config/history may be unavailable without blocking this view.
+      const runs=await backend.listRuns();if(token!==state.loadToken||window.CPC1_SESSION_ENDED)return;
+      state.runs=runs||[];summary.setData(state.runs,Object.keys(systems).filter(system=>backend.permissionsFor(system).can_view));summaryReady=true;
+      const configs={};
+      for(const system of visible)configs[system]=system==='steam'?await backend.getConfig():await backend.getGasConfig(system);
+      const history=await backend.listHistory();if(token!==state.loadToken||window.CPC1_SESSION_ENDED)return;
+      $('create-run').hidden=!entering.length;state.configs=configs;state.history=history||[];
+      state.activeSystem=route.dedicated&&archiveVisible.includes(route.system)?route.system:archiveVisible[0]||'';
+      renderCampaignSystems();selectOptions($('single-system'),entering.map(value=>({value,label:systems[value]})));
+      selectOptions($('trend-system'),archiveVisible.map(value=>({value,label:systems[value]})),state.activeSystem);
+      renderRuns();renderTrend();toggleMode();message('Đã tải dữ liệu đợt và xu hướng.');
+    } catch(error) {
+      if(token!==state.loadToken)return;
+      if(!summaryReady)summary.fail(errorText(error));
+      message(errorText(error));
+      $('run-list').replaceChildren(el('p',{className:'empty',text:'Không tải được danh sách đợt. Dữ liệu đang nhập vẫn được giữ.'}));
+    }
+  }
+
   // ---- Tab Tổng quan ----
   const overviewState = { token: 0, loaded: false, data: null, grid: null, gridToken: 0, snapshots: new Map(), runList: null };
   const overviewYear = () => Number(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(0, 4));
@@ -521,11 +550,13 @@
     }
   }
   function tabs() {
-    const buttons=[$('runs-tab'),$('trend-tab'),$('overview-tab')], panels=[$('runs-panel'),$('trend-panel'),$('overview-panel')], last=buttons.length-1;
-    function activate(index){buttons.forEach((b,i)=>{b.setAttribute('aria-selected',String(i===index));b.tabIndex=i===index?0:-1;panels[i].hidden=i!==index;});if(index===1)renderTrend();if(index===2&&!overviewState.loaded)void loadOverview();}
-    buttons.forEach((b,i)=>{b.addEventListener('click',()=>activate(i));b.addEventListener('keydown',e=>{const index=e.key==='Home'?0:e.key==='End'?last:e.key==='ArrowLeft'?(i+last)%buttons.length:e.key==='ArrowRight'?(i+1)%buttons.length:null;if(index===null)return;e.preventDefault();activate(index);buttons[index].focus();});});if(route.dedicated){document.querySelector('.page-tabs').hidden=true;$('trend-system-control').hidden=true;document.querySelector('h1').textContent=`Xu hướng · ${systems[route.system]}`;document.title=`Xu hướng ${systems[route.system]} | VMP`;document.querySelector('.runs-shell>.intro').textContent='So sánh số đo và độ phân tán giữa các điểm trong một đợt lấy mẫu.';activate(1);}else activate(0);
+    const originalTitle=document.querySelector('h1').textContent,originalIntro=document.querySelector('.runs-shell>.intro').textContent;
+    const buttons=[$('runs-tab'),$('trend-tab'),$('overview-tab'),$('summary-tab')], panels=[$('runs-panel'),$('trend-panel'),$('overview-panel'),$('summary-panel')], last=buttons.length-1;
+    function activate(index){if(!route.dedicated){document.querySelector('h1').textContent=index===3?'Tổng hợp kết quả khí & hơi':originalTitle;document.title=index===3?'Tổng hợp kết quả khí & hơi | VMP':'Đợt thực hiện và xu hướng | VMP';document.querySelector('.runs-shell>.intro').textContent=index===3?'Theo dõi tiến độ đã lưu, xem kết quả theo khu và lọc chỉ tiêu cần kiểm tra.':originalIntro;}buttons.forEach((b,i)=>{b.setAttribute('aria-selected',String(i===index));b.tabIndex=i===index?0:-1;panels[i].hidden=i!==index;});if(index===1)renderTrend();if(index===2&&!overviewState.loaded)void loadOverview();if(index===3)summary.activate();}
+    buttons.forEach((b,i)=>{b.addEventListener('click',()=>activate(i));b.addEventListener('keydown',e=>{const index=e.key==='Home'?0:e.key==='End'?last:e.key==='ArrowLeft'?(i+last)%buttons.length:e.key==='ArrowRight'?(i+1)%buttons.length:null;if(index===null)return;e.preventDefault();activate(index);buttons[index].focus();});});if(route.dedicated){document.querySelector('.page-tabs').hidden=true;$('trend-system-control').hidden=true;document.querySelector('h1').textContent=`Xu hướng · ${systems[route.system]}`;document.title=`Xu hướng ${systems[route.system]} | VMP`;document.querySelector('.runs-shell>.intro').textContent='So sánh số đo và độ phân tán giữa các điểm trong một đợt lấy mẫu.';activate(1);}else activate(new URLSearchParams(location.search).get('view')==='summary'?3:0);
   }
   $('create-run').addEventListener('submit',async event=>{ event.preventDefault(); const error=$('create-error'); error.hidden=true; try { const data=definition(), submit=$('create-submit'); submit.disabled=true; const created=await window.CPC1Backend.createRun(data,requestId(data)); requestIds.delete(payloadKey(data)); state.runs.unshift(created); renderRuns(); event.target.reset();$('run-started').value=new Date().toLocaleDateString('en-CA');toggleMode(); message('Đã tạo đợt thực hiện.'); } catch(err) { error.textContent=errorText(err); error.hidden=false; } finally { $('create-submit').disabled=false; } });
   document.querySelectorAll('input[name="mode"]').forEach(input=>input.addEventListener('change',toggleMode)); $('single-system').addEventListener('change',()=>{renderScopePicker();void loadRequirements();});$('scope-picker').addEventListener('change',()=>void loadRequirements());$('campaign-systems').addEventListener('change',()=>void loadRequirements()); $('reload-runs').addEventListener('click',load);$('reload-overview').addEventListener('click',()=>void loadOverview());$('run-started').addEventListener('change',()=>renderRequirements(state.requirements,calibrationValue())); ['trend-system','trend-record','trend-form','trend-point','trend-metric'].forEach(id => $(id).addEventListener('change',()=>{state.hiddenPoints.clear();renderTrend();})); tabs(); $('run-started').value = new Date().toLocaleDateString('en-CA'); load();
+  window.addEventListener('cpc1:permission-denied',()=>{state.loadToken++;state.accessRevision++;summary.clear();});
   window.addEventListener('cpc1:permissions-refreshed',()=>{void load();overviewState.loaded=false;if(!$('overview-panel').hidden)void loadOverview();});
 })();

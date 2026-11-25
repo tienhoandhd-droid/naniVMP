@@ -27,6 +27,7 @@ const SYSTEM_NAMES: Record<QualificationSystem, string> = {
 export function qualificationNavigationForSystems(systems: readonly QualificationSystem[]): QualificationNavigationGroup[] {
   const groups: QualificationNavigationGroup[] = [
     { label: "Đợt thẩm định", target: "runs.html" },
+    { label: "Tổng hợp kết quả", target: "runs.html?view=summary" },
     { label: "Nhật ký thay đổi", target: "nhat-ky.html" },
   ];
   for (const system of ["steam", "air", "nitrogen"] as const) {
